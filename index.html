@@ -1,0 +1,1768 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MarginTracker Pro</title>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js" crossorigin="anonymous"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js" crossorigin="anonymous"></script>
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --primary:#1a73e8;--primary-dark:#1557b0;--success:#0f9d58;--danger:#d93025;
+  --warning:#e37400;--bg:#f0f2f5;--card:#fff;--border:#dadce0;--text:#202124;--text2:#5f6368;--sb:220px;
+  --admin:#6200ea;--admin-dark:#4a00b4;
+}
+body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:13px}
+
+/* ── LOGIN SCREEN ── */
+#loginScreen{display:flex;align-items:center;justify-content:center;min-height:100vh;background:linear-gradient(135deg,#1c2331 0%,#2d3748 100%)}
+.login-box{background:#fff;border-radius:16px;padding:36px 32px;width:340px;box-shadow:0 12px 40px rgba(0,0,0,.25);text-align:center}
+.login-box .logo{font-size:32px;margin-bottom:8px}
+.login-box h1{font-size:20px;font-weight:700;margin-bottom:4px}
+.login-box .sub{font-size:13px;color:var(--text2);margin-bottom:24px}
+.pin-display{display:flex;justify-content:center;gap:12px;margin-bottom:20px}
+.pin-dot{width:16px;height:16px;border-radius:50%;border:2px solid var(--border);transition:all .2s}
+.pin-dot.filled{background:var(--primary);border-color:var(--primary)}
+.pin-dot.error{background:var(--danger);border-color:var(--danger)}
+.pin-dot.admin{background:var(--admin);border-color:var(--admin)}
+.pin-dot.superuser{background:#00897b;border-color:#00897b}
+.superuser-badge{display:inline-flex;align-items:center;gap:5px;background:#e0f2f1;color:#00695c;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;margin-bottom:14px}
+.superuser-bar{background:linear-gradient(90deg,#00695c,#00897b);color:#fff;padding:8px 16px;font-size:12px;font-weight:600;text-align:center;letter-spacing:.3px;margin-bottom:12px;border-radius:8px}
+.pin-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;max-width:220px;margin:0 auto 16px}
+.pin-btn{padding:16px;border-radius:10px;border:1px solid var(--border);font-size:18px;font-weight:600;cursor:pointer;background:#fff;color:var(--text);transition:all .15s}
+.pin-btn:hover{background:var(--primary);color:#fff;border-color:var(--primary)}
+.pin-btn.del{font-size:14px;color:var(--text2)}
+.pin-btn.del:hover{background:var(--danger);color:#fff;border-color:var(--danger)}
+#loginMsg{font-size:13px;color:var(--danger);min-height:20px;margin-top:4px}
+#loginMsg.success{color:var(--success)}
+
+/* ── APP SHELL ── */
+#appShell{display:none}
+.app-layout{display:flex;min-height:100vh}
+
+/* ── SIDEBAR ── */
+#sb{width:var(--sb);background:#1c2331;color:#fff;display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;overflow-y:auto;z-index:100}
+#sb .logo{padding:14px 14px 10px;border-bottom:1px solid #2d3748}
+#sb .logo .dname{font-size:13px;font-weight:700;color:#8ab4f8}
+#sb .logo .dloc{font-size:11px;color:#9aa0a6;margin-top:1px}
+#sb .logo .dmgr{font-size:10px;color:#5f6368;margin-top:1px}
+#sb nav button{display:block;width:100%;text-align:left;padding:8px 14px;background:none;border:none;color:#bdc1c6;font-size:12px;cursor:pointer;border-left:3px solid transparent;transition:background .15s}
+#sb nav button:hover{background:#2d3748;color:#fff}
+#sb nav button.active{background:#2d3748;color:#8ab4f8;border-left-color:#8ab4f8;font-weight:600}
+#sb .slbl{padding:10px 14px 2px;font-size:9px;text-transform:uppercase;color:#5f6368;letter-spacing:1px}
+#sb .logout-btn{margin:12px 14px;padding:8px;border-radius:8px;border:1px solid #2d3748;background:none;color:#9aa0a6;font-size:12px;cursor:pointer;text-align:center;transition:all .15s}
+#sb .logout-btn:hover{background:#d93025;color:#fff;border-color:#d93025}
+
+/* ── MAIN ── */
+#main{margin-left:var(--sb);flex:1;padding:20px;min-height:100vh}
+.page{display:none}.page.active{display:block}
+
+/* ── ADMIN BADGE ── */
+.admin-badge{display:inline-flex;align-items:center;gap:5px;background:#ede7f6;color:var(--admin);padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;margin-bottom:14px}
+
+/* ── CARDS ── */
+.card{background:var(--card);border-radius:10px;border:1px solid var(--border);padding:16px;margin-bottom:14px}
+.card h2{font-size:14px;font-weight:600;margin-bottom:12px}
+
+/* ── METRIC TILES ── */
+.mgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:14px}
+.mtile{background:var(--card);border-radius:10px;border:1px solid var(--border);padding:12px;text-align:center}
+.mtile .lbl{font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px}
+.mtile .val{font-size:19px;font-weight:700;line-height:1.2}
+.mtile .sub{font-size:10px;color:var(--text2);margin-top:2px}
+.val.green{color:var(--success)}.val.red{color:var(--danger)}.val.blue{color:var(--primary)}.val.orange{color:var(--warning)}.val.purple{color:#7c4dff}
+
+/* ── BUDGET TILES ── */
+.btile{background:var(--card);border-radius:10px;border:1px solid var(--border);padding:12px}
+.btile .blbl{font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px}
+.btile .brow{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px}
+.btile .bact{font-size:17px;font-weight:700}
+.btile .bbud{font-size:11px;color:var(--text2)}
+.bdiff{font-size:11px;font-weight:700;padding:2px 7px;border-radius:8px;display:inline-block;margin-top:3px}
+.bdiff.up{background:#e6f4ea;color:var(--success)}.bdiff.down{background:#fce8e6;color:var(--danger)}
+
+/* ── INV CARD ── */
+.inv-card{background:#fffde7;border:1px solid #f9e076;border-radius:10px;padding:12px;margin-bottom:14px}
+.inv-card h3{font-size:12px;font-weight:600;color:#795548;margin-bottom:8px}
+.inv-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+/* ── FORMS ── */
+.fgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:12px}
+.fg{display:flex;flex-direction:column;gap:4px}
+.fg label{font-size:11px;font-weight:600;color:var(--text2)}
+input,select{border:1px solid var(--border);border-radius:6px;padding:7px 9px;font-size:13px;color:var(--text);background:#fff;width:100%;transition:border-color .15s}
+input:focus,select:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 2px rgba(26,115,232,.12)}
+
+/* ── BUTTONS ── */
+.btn{padding:7px 14px;border-radius:6px;border:1px solid var(--border);font-size:13px;font-weight:600;cursor:pointer;background:#fff;color:var(--text);transition:background .15s}
+.btn:hover{background:#f8f9fa}
+.btn.primary{background:var(--primary);color:#fff;border-color:var(--primary)}.btn.primary:hover{background:var(--primary-dark)}
+.btn.success{background:var(--success);color:#fff;border-color:var(--success)}
+.btn.danger{background:var(--danger);color:#fff;border-color:var(--danger)}
+.btn.admin-btn{background:var(--admin);color:#fff;border-color:var(--admin)}
+.btn.admin-btn:hover{background:var(--admin-dark)}
+.btn.sm{padding:4px 9px;font-size:11px}
+.bg{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+
+/* ── TABLES ── */
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:12px}
+thead th{background:#f8f9fa;padding:7px 10px;text-align:left;font-weight:600;font-size:10px;text-transform:uppercase;color:var(--text2);border-bottom:2px solid var(--border);white-space:nowrap}
+tbody tr{border-bottom:1px solid #f1f3f4}
+tbody tr:hover{background:#f8f9fa}
+tbody td{padding:6px 10px}
+.badge{display:inline-block;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:600}
+.bp{background:#e8f0fe;color:#1557b0}.bs{background:#e6f4ea;color:#0f9d58}.bc{background:#fce8e6;color:#d93025}
+.bk{background:#fff3e0;color:#e37400}.bo{background:#f3e8fd;color:#9334e6}
+.bti{background:#e0f7fa;color:#006064}.bto{background:#fce4ec;color:#880e4f}
+
+/* ── CHIPS ── */
+.chip{display:inline-flex;align-items:center;padding:2px 7px;border-radius:10px;font-size:11px;font-weight:600}
+.chip.g{background:#e6f4ea;color:var(--success)}.chip.r{background:#fce8e6;color:var(--danger)}.chip.o{background:#fff3e0;color:var(--warning)}
+
+/* ── WEEK HEADER ── */
+.wh{background:linear-gradient(135deg,#1c2331,#2d3748);color:#fff;border-radius:10px;padding:11px 15px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+.wh .wt{font-size:13px;font-weight:700}.wh .wd{font-size:10px;color:#9aa0a6;margin-top:1px}
+.wh .ws{display:flex;gap:14px;flex-wrap:wrap}
+.wsl .wll{font-size:9px;color:#9aa0a6;text-transform:uppercase}.wsl .wvl{font-size:14px;font-weight:700}
+.wvl.green{color:#34a853}.wvl.red{color:#ea4335}.wvl.blue{color:#8ab4f8}
+
+/* ── PERIOD BANNER ── */
+.pmbanner{border-radius:10px;padding:13px 16px;margin-bottom:13px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+.pmbanner.good{background:linear-gradient(135deg,#0d7a45,#1a9e59);color:#fff}
+.pmbanner.warn{background:linear-gradient(135deg,#b36200,#e37400);color:#fff}
+.pmbanner.bad{background:linear-gradient(135deg,#b71c1c,#d93025);color:#fff}
+.pmbanner .pmt{font-size:13px;font-weight:700}.pmbanner .pms{font-size:10px;opacity:.85;margin-top:2px}
+.pmbanner .pmv{font-size:26px;font-weight:800}.pmbanner .pmd{font-size:11px;opacity:.85;margin-top:1px}
+
+/* ── TABLE ROW COLORS ── */
+.wtr{background:#1c2331!important}.wtr td{color:#fff!important;font-weight:700}
+.tod{background:#e8f5e9!important}.sat{background:#e8f0fe!important}
+
+/* ── PAGE HEADER ── */
+.ph{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;flex-wrap:wrap;gap:10px}
+.ph h1{font-size:18px;font-weight:700}.ph .sub{font-size:11px;color:var(--text2);margin-top:2px}
+
+/* ── YTD ── */
+.ytdg{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:11px;margin-bottom:16px}
+.yc{background:var(--card);border-radius:10px;border:1px solid var(--border);padding:13px;text-align:center}
+.yc .yl{font-size:10px;color:var(--text2);margin-bottom:4px;text-transform:uppercase;letter-spacing:.4px}
+.yc .yv{font-size:22px;font-weight:800}
+.pb{background:#e0e0e0;border-radius:4px;height:6px;margin-top:5px;overflow:hidden}
+.pbi{height:6px;border-radius:4px;transition:width .4s}
+
+/* ── ADMIN DEPT CARDS ── */
+.dept-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-bottom:16px}
+.dept-card{background:var(--card);border-radius:10px;border:1px solid var(--border);padding:14px}
+.dept-card .dc-name{font-size:14px;font-weight:700;margin-bottom:2px}
+.dept-card .dc-loc{font-size:11px;color:var(--text2)}
+.dept-card .dc-mgr{font-size:11px;color:var(--text2)}
+.dept-card .dc-stats{display:flex;gap:12px;margin:10px 0 10px;flex-wrap:wrap}
+.dept-card .dc-stat .dcl{font-size:9px;color:var(--text2);text-transform:uppercase}
+.dept-card .dc-stat .dcv{font-size:15px;font-weight:700}
+.dept-card .dc-actions{display:flex;gap:6px;flex-wrap:wrap}
+
+/* ── ADMIN OVERVIEW TABLE ── */
+.overview-highlight{background:#f3e8fd!important}
+
+/* ── TOAST ── */
+#toast{position:fixed;bottom:20px;right:20px;background:#323232;color:#fff;padding:10px 16px;border-radius:8px;font-size:13px;z-index:9999;opacity:0;transform:translateY(8px);transition:all .3s;pointer-events:none}
+#toast.show{opacity:1;transform:translateY(0)}
+#toast.success{background:var(--success)}#toast.error{background:var(--danger)}
+
+/* ── MODALS ── */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:500;align-items:center;justify-content:center}
+.modal-overlay.open{display:flex}
+.modal{background:#fff;border-radius:12px;padding:20px;width:90%;max-width:500px;box-shadow:0 8px 32px rgba(0,0,0,.2);max-height:90vh;overflow-y:auto}
+.modal h2{font-size:15px;margin-bottom:12px}
+
+/* ── LOADING ── */
+#loadingOverlay{position:fixed;inset:0;background:#1c2331;display:flex;align-items:center;justify-content:center;z-index:9999;flex-direction:column;gap:14px}
+#loadingOverlay .spin{width:36px;height:36px;border:3px solid #2d3748;border-top-color:#8ab4f8;border-radius:50%;animation:spin .8s linear infinite}
+#loadingOverlay p{color:#9aa0a6;font-size:13px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.sset{margin-bottom:18px;padding-bottom:16px;border-bottom:1px solid var(--border)}
+.sset:last-child{border-bottom:none;margin-bottom:0}
+.sset h3{font-size:13px;font-weight:700;margin-bottom:10px}
+.infobox{background:#e8f0fe;border:1px solid #c5d8fa;border-radius:8px;padding:9px 13px;font-size:12px;color:#1557b0;margin-bottom:12px}
+.warnbox{background:#fff3e0;border:1px solid #ffe082;border-radius:8px;padding:9px 13px;font-size:12px;color:#e65100;margin-bottom:12px}
+.divider{height:1px;background:var(--border);margin:14px 0}
+.empty{text-align:center;padding:30px;color:var(--text2);font-size:13px}
+.formula-box{background:#f8f9fa;border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:11px;color:var(--text2);margin-bottom:12px;line-height:1.9}
+.formula-box strong{color:var(--text)}
+
+@media(max-width:700px){
+  #sb{width:56px}#sb .logo .dloc,#sb .logo .dmgr,#sb .nav-text,#sb .slbl{display:none}
+  #sb .logo .dname{font-size:10px}#sb nav button{padding:10px;text-align:center}
+  #main{margin-left:56px;padding:12px}.fgrid{grid-template-columns:1fr}.inv-grid{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div id="loadingOverlay">
+  <div class="spin"></div>
+  <p>Connecting to database...</p>
+</div>
+
+<!-- LOGIN -->
+<div id="loginScreen" style="display:none">
+  <div class="login-box">
+    <div class="logo">📊</div>
+    <h1>MarginTracker Pro</h1>
+    <div class="sub">Enter your 6-digit PIN to continue</div>
+    <div class="pin-display">
+      <div class="pin-dot" id="pd0"></div>
+      <div class="pin-dot" id="pd1"></div>
+      <div class="pin-dot" id="pd2"></div>
+      <div class="pin-dot" id="pd3"></div>
+      <div class="pin-dot" id="pd4"></div>
+      <div class="pin-dot" id="pd5"></div>
+    </div>
+    <div class="pin-grid">
+      <button class="pin-btn" onclick="pinPress('1')">1</button>
+      <button class="pin-btn" onclick="pinPress('2')">2</button>
+      <button class="pin-btn" onclick="pinPress('3')">3</button>
+      <button class="pin-btn" onclick="pinPress('4')">4</button>
+      <button class="pin-btn" onclick="pinPress('5')">5</button>
+      <button class="pin-btn" onclick="pinPress('6')">6</button>
+      <button class="pin-btn" onclick="pinPress('7')">7</button>
+      <button class="pin-btn" onclick="pinPress('8')">8</button>
+      <button class="pin-btn" onclick="pinPress('9')">9</button>
+      <button class="pin-btn" onclick="pinPress('0')">0</button>
+      <button class="pin-btn del" onclick="pinDel()">⌫</button>
+      <button class="pin-btn del" onclick="pinClear()">✕</button>
+    </div>
+    <div id="loginMsg"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="appShell">
+  <div class="app-layout">
+    <nav id="sb">
+      <div class="logo">
+        <div class="dname" id="sbDeptName">MarginTracker</div>
+        <div class="dloc" id="sbLocation"></div>
+        <div class="dmgr" id="sbManager"></div>
+      </div>
+      <div id="sbDualToggle" style="display:none" class="dual-toggle">
+        <button id="dtBtn1" onclick="switchTracker('primary')"></button>
+        <button id="dtBtn2" onclick="switchTracker('secondary')"></button>
+      </div>
+      <nav id="sideNav"></nav>
+      <button class="logout-btn" onclick="logout()">🔒 Lock / Switch User</button>
+    </nav>
+    <div id="main"><div id="pages"></div></div>
+  </div>
+</div>
+
+<!-- RESTORE CONFIRM MODAL -->
+<div class="modal-overlay" id="restoreConfirmModal">
+  <div class="modal">
+    <h2>&#9888; Confirm Restore</h2>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:8px">You are about to restore from backup:</p>
+    <div id="restoreFileInfo" style="background:#fff3e0;border-radius:8px;padding:10px;font-size:13px;margin-bottom:14px;border-left:3px solid var(--warning)"></div>
+    <p style="font-size:13px;color:var(--danger);font-weight:600;margin-bottom:16px">This will overwrite ALL current data and cannot be undone.</p>
+    <div class="bg">
+      <button class="btn danger" id="confirmRestoreBtn">Yes, Restore Now</button>
+      <button class="btn" onclick="closeModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+<!-- TOAST -->
+<div id="toast"></div>
+
+<!-- DELETE MODAL -->
+<div class="modal-overlay" id="delModal">
+  <div class="modal">
+    <h2>Delete Entry</h2>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:14px">Are you sure? This cannot be undone.</p>
+    <div class="bg"><button class="btn danger" id="confirmDel">Delete</button><button class="btn" onclick="closeModal()">Cancel</button></div>
+  </div>
+</div>
+
+<!-- EDIT MODAL -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal">
+    <h2>Edit Entry</h2>
+    <div class="fgrid" style="grid-template-columns:1fr 1fr">
+      <div class="fg"><label>Date</label><input type="date" id="editDate"></div>
+      <div class="fg"><label>Type</label>
+        <select id="editType">
+          <option value="purchase">Purchase Invoice</option><option value="sale">Sales</option>
+          <option value="credit">Credit</option><option value="scanback">Scanback</option>
+          <option value="outside">Outside Supplier</option>
+          <option value="transferin">Transfer In</option><option value="transferout">Transfer Out</option>
+        </select>
+      </div>
+      <div class="fg"><label>Amount ($)</label><input type="number" id="editAmt" step="0.01"></div>
+      <div class="fg"><label>Description</label><input type="text" id="editDesc"></div>
+    </div>
+    <div class="bg"><button class="btn primary" id="confirmEdit">Save</button><button class="btn" onclick="closeModal()">Cancel</button></div>
+  </div>
+</div>
+
+<!-- ADD/EDIT DEPT MODAL -->
+<div class="modal-overlay" id="deptModal">
+  <div class="modal">
+    <h2 id="deptModalTitle">Add Department</h2>
+    <div class="fgrid">
+      <div class="fg"><label>Department Name *</label><input type="text" id="dmName" placeholder="e.g. Produce, Deli, Bakery"></div>
+      <div class="fg"><label>Location *</label><input type="text" id="dmLoc" placeholder="e.g. Store #1, Main St"></div>
+      <div class="fg"><label>Manager Name</label><input type="text" id="dmMgr" placeholder="e.g. John Smith"></div>
+      <div class="fg"><label>6-Digit PIN *</label><input type="text" id="dmPin" maxlength="6" placeholder="e.g. 111111"></div>
+    </div>
+    <div class="warnbox">⚠️ PIN must be exactly 6 digits and unique. Do not share PINs between departments.</div>
+    <div class="fg" style="margin-bottom:10px">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:600">
+        <input type="checkbox" id="dmDual" style="width:16px;height:16px;cursor:pointer">
+        Enable Dual Tracker (e.g. Instore + Commercial Bakery)
+      </label>
+      <div id="dmDualNames" style="display:none;margin-top:10px">
+        <div class="fgrid" style="grid-template-columns:1fr 1fr">
+          <div class="fg"><label>Tracker 1 Name</label><input type="text" id="dmTracker1" placeholder="e.g. Instore Bakery" value="Instore"></div>
+          <div class="fg"><label>Tracker 2 Name</label><input type="text" id="dmTracker2" placeholder="e.g. Commercial Bakery" value="Commercial"></div>
+        </div>
+      </div>
+    </div>
+    <div class="bg"><button class="btn primary" id="confirmDept">Save Department</button><button class="btn" onclick="closeModal()">Cancel</button></div>
+  </div>
+</div>
+
+
+<!-- SUPERUSER PIN MODAL -->
+<div class="modal-overlay" id="suPinModal">
+  <div class="modal">
+    <h2>Change Superuser PIN</h2>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:14px">The Superuser PIN gives read-only access to all departments.</p>
+    <div class="fgrid" style="grid-template-columns:1fr">
+      <div class="fg"><label>New Superuser PIN (6 digits)</label><input type="text" id="suPinInput" maxlength="6" placeholder="e.g. 123456"></div>
+    </div>
+    <div class="bg"><button class="btn primary" onclick="saveSuperuserPin()">Save PIN</button><button class="btn" onclick="closeModal()">Cancel</button></div>
+  </div>
+</div>
+
+<script>
+// ╔══════════════════════════════════════════════════════════╗
+// ║  FIREBASE CONFIG — REPLACE WITH YOUR OWN CONFIG BELOW   ║
+// ╚══════════════════════════════════════════════════════════╝
+const FIREBASE_CONFIG = {
+  apiKey:            "AIzaSyBlum4fAE-BzjJJuST6eCH8uqjO4gMtS5w",
+  authDomain:        "storebackroom-e044c.firebaseapp.com",
+  databaseURL:       "https://storebackroom-e044c-default-rtdb.firebaseio.com",
+  projectId:         "storebackroom-e044c",
+  storageBucket:     "storebackroom-e044c.firebasestorage.app",
+  messagingSenderId: "1082072985328",
+  appId:             "1:1082072985328:web:1ad888b9b6e65f0c4e9c35"
+};
+
+// Admin PIN — change this to your desired admin PIN
+const ADMIN_PIN = "258004";
+const SUPERUSER_PIN_DEFAULT = "000000";
+
+// ── FIREBASE INIT ──────────────────────────────────────────
+let db = null;
+
+function initFirebase() {
+  if(typeof firebase === 'undefined') return false;
+  try {
+    if(!firebase.apps || !firebase.apps.length) {
+      firebase.initializeApp(FIREBASE_CONFIG);
+    }
+    db = firebase.database();
+    return true;
+  } catch(e) {
+    console.error('Firebase init error:', e);
+    return false;
+  }
+}
+
+// Try immediately
+initFirebase();
+
+// ── CONSTANTS ──────────────────────────────────────────────
+const PERIODS = 13, WPP = 4;
+
+// ── SESSION STATE ──────────────────────────────────────────
+let session = {
+  isAdmin: false,
+  isSuperuser: false,
+  deptId: null,
+  dept: null,
+  viewingAs: null,
+  subDept: 'primary'  // 'primary' or 'secondary' for dual-tracker depts
+};
+let _superuserPin = SUPERUSER_PIN_DEFAULT;
+
+// ── IN-MEMORY STORE (synced from Firebase) ─────────────────
+let allDepts   = {};  // { deptId: {name, location, manager, pin} }
+let deptData   = {};  // { deptId: {entries:{}, inventory:{}, budget:{}} }
+
+// ── PIN INPUT STATE ────────────────────────────────────────
+let pinBuffer = '';
+
+// ══════════════════════════════════════════════════════════
+// FIREBASE HELPERS
+// ══════════════════════════════════════════════════════════
+function fbRef(path){
+  if(!db && !initFirebase()){
+    console.warn('Firebase not ready for path:', path);
+    return null;
+  }
+  return db ? db.ref(path) : null;
+}
+
+function loadDepts(cb){
+  var ref = fbRef('departments');
+  if(!ref){ if(cb) cb(); return; }
+  ref.on('value', function(snap){
+    allDepts = snap.val() || {};
+    if(cb) cb();
+  });
+}
+
+function loadDeptData(deptId, cb){
+  var ref = fbRef('data/' + deptId);
+  if(!ref){
+    deptData[deptId] = {entries:{}, inventory:{}, budget:{salesYear:0,marginPct:0}, settings:{targetMargin:30, fiscalYear:new Date().getFullYear()}};
+    if(cb) cb();
+    return;
+  }
+  // .once() so callback fires exactly once
+  ref.once('value', function(snap){
+    const val = snap.val() || {};
+    deptData[deptId] = {
+      entries:   val.entries   || {},
+      inventory: val.inventory || {},
+      budget:    val.budget    || {salesYear:0, marginPct:0},
+      settings:  val.settings  || {targetMargin:30, fiscalYear:new Date().getFullYear()}
+    };
+    // Set up live listener for real-time updates (no callback - just keeps data fresh)
+    ref.on('value', function(snap2){
+      var val2 = snap2.val() || {};
+      deptData[deptId] = {
+        entries:   val2.entries   || {},
+        inventory: val2.inventory || {},
+        budget:    val2.budget    || {salesYear:0, marginPct:0},
+        settings:  val2.settings  || {targetMargin:30, fiscalYear:new Date().getFullYear()}
+      };
+    });
+    if(cb) cb();
+  });
+}
+
+function saveDeptField(deptId, field, value){
+  var r=fbRef('data/'+deptId+'/'+field); if(r) r.set(value);
+}
+
+function saveEntry(deptId, entry){
+  var r=fbRef('data/'+deptId+'/entries/'+entry.id); if(r) r.set(entry);
+}
+
+function deleteEntry(deptId, entryId){
+  var r=fbRef('data/'+deptId+'/entries/'+entryId); if(r) r.remove();
+}
+
+function saveDept(deptId, deptObj){
+  var r=fbRef('departments/'+deptId); if(r) r.set(deptObj);
+}
+
+function deleteDept(deptId){
+  var r1=fbRef('departments/'+deptId); if(r1) r1.remove();
+  var r2=fbRef('data/'+deptId); if(r2) r2.remove();
+}
+
+// ══════════════════════════════════════════════════════════
+// PIN LOGIN
+// ══════════════════════════════════════════════════════════
+function pinPress(d){
+  if(pinBuffer.length >= 6) return;
+  pinBuffer += d;
+  updatePinDisplay();
+  if(pinBuffer.length === 6) setTimeout(checkPin, 120);
+}
+function pinDel(){ pinBuffer = pinBuffer.slice(0,-1); updatePinDisplay(); }
+function pinClear(){ pinBuffer = ''; updatePinDisplay(false); setLoginMsg(''); }
+
+function updatePinDisplay(err){
+  for(let i=0;i<6;i++){
+    const dot = document.getElementById('pd'+i);
+    if(!dot) continue;
+    dot.className = 'pin-dot';
+    if(err === 'error') dot.classList.add('error');
+    else if(err === 'admin') dot.classList.add('admin');
+    else if(err === 'superuser') dot.classList.add('superuser');
+    else if(i < pinBuffer.length) dot.classList.add('filled');
+  }
+}
+
+function setLoginMsg(msg, type=''){
+  const el = document.getElementById('loginMsg');
+  el.textContent = msg;
+  el.className = type;
+}
+
+function checkPin(){
+  // Admin PIN — always FIRST priority
+  if(pinBuffer === ADMIN_PIN){
+    updatePinDisplay('admin');
+    setLoginMsg('Admin access granted', 'success');
+    setTimeout(function(){ launchAdmin(); }, 400);
+    return;
+  }
+  // Superuser PIN — second
+  if(pinBuffer === _superuserPin && _superuserPin !== ADMIN_PIN){
+    updatePinDisplay('superuser');
+    setLoginMsg('Superuser — read-only access', 'success');
+    setTimeout(function(){ launchSuperuser(); }, 400);
+    return;
+  }
+  // Department PINs
+  var match = null;
+  var entries = Object.entries(allDepts);
+  for(var i=0;i<entries.length;i++){
+    if(entries[i][1].pin === pinBuffer){ match = entries[i]; break; }
+  }
+  if(match){
+    var deptId = match[0], dept = match[1];
+    updatePinDisplay('filled');
+    setLoginMsg('Welcome, ' + dept.name + '!', 'success');
+    setTimeout(function(){ launchDept(deptId, dept); }, 400);
+    return;
+  }
+  // Wrong PIN
+  updatePinDisplay('error');
+  setLoginMsg('Incorrect PIN. Please try again.');
+  setTimeout(function(){ pinBuffer = ''; updatePinDisplay(); setLoginMsg(''); }, 1200);
+}
+
+function launchDept(deptId, dept){
+  session.isAdmin     = false;
+  session.isSuperuser = false;
+  session.deptId      = deptId;
+  session.dept        = dept;
+  session.viewingAs   = null;
+  session.subDept     = 'primary';
+
+  function doLaunch(){
+    buildApp(true, false);
+    showAppShell();
+  }
+
+  // Always load primary first - this alone is enough to launch
+  // Secondary (commercial) is loaded silently in background if dual
+  loadDeptData(deptId, function(){
+    doLaunch();
+    // After app is shown, silently preload secondary data if dual tracker
+    if(dept.dual){
+      loadDeptData(deptId + '_commercial', function(){});
+    }
+  });
+}
+
+function launchAdmin(){
+  session.isAdmin = true; session.isSuperuser = false;
+  session.deptId = '__admin__';
+  session.dept = {name:'Admin', location:'All Departments', manager:'Administrator'};
+  session.viewingAs = null;
+
+  function finishAdminLaunch(){
+    buildApp(false, true);
+    showAppShell();
+    setTimeout(updateBackupNavBadge, 300);
+  }
+
+  function loadAllDepts(){
+    var ids = Object.keys(allDepts);
+    if(ids.length === 0){ finishAdminLaunch(); return; }
+    var loaded = 0, launched = false;
+    var safety = setTimeout(function(){
+      if(!launched){ launched=true; finishAdminLaunch(); }
+    }, 6000);
+    ids.forEach(function(id){
+      loadDeptData(id, function(){
+        loaded++;
+        if(loaded >= ids.length && !launched){
+          launched = true;
+          clearTimeout(safety);
+          finishAdminLaunch();
+        }
+      });
+    });
+  }
+
+  // If allDepts empty, fetch fresh from Firebase first
+  if(Object.keys(allDepts).length === 0 && db){
+    var ref = fbRef('departments');
+    if(ref){
+      ref.once('value', function(snap){
+        allDepts = snap.val() || {};
+        loadAllDepts();
+      });
+    } else { finishAdminLaunch(); }
+  } else {
+    loadAllDepts();
+  }
+}
+
+function launchSuperuser(){
+  session.isAdmin = true; session.isSuperuser = true;
+  session.deptId = '__superuser__';
+  session.dept = {name:'Superuser', location:'Read-Only', manager:''};
+  session.viewingAs = null;
+
+  function finishSULaunch(){
+    buildApp(false, true);
+    showAppShell();
+  }
+
+  function loadAllSU(){
+    var ids = Object.keys(allDepts);
+    if(ids.length === 0){ finishSULaunch(); return; }
+    var loaded = 0, launched = false;
+    var safety = setTimeout(function(){
+      if(!launched){ launched=true; finishSULaunch(); }
+    }, 6000);
+    ids.forEach(function(id){
+      loadDeptData(id, function(){
+        loaded++;
+        if(loaded >= ids.length && !launched){
+          launched = true;
+          clearTimeout(safety);
+          finishSULaunch();
+        }
+      });
+    });
+  }
+
+  if(Object.keys(allDepts).length === 0 && db){
+    var ref = fbRef('departments');
+    if(ref){ ref.once('value', function(snap){ allDepts=snap.val()||{}; loadAllSU(); }); }
+    else finishSULaunch();
+  } else { loadAllSU(); }
+}
+
+function showAppShell(){
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('appShell').style.display = 'block';
+}
+
+function logout(){
+  session = {isAdmin:false, isSuperuser:false, deptId:null, dept:null, viewingAs:null, subDept:'primary'};
+  pinBuffer = '';
+  updatePinDisplay();
+  setLoginMsg('');
+  document.getElementById('appShell').style.display = 'none';
+  document.getElementById('loginScreen').style.display = 'flex';
+  document.getElementById('pages').innerHTML = '';
+  document.getElementById('sideNav').innerHTML = '';
+}
+
+// ══════════════════════════════════════════════════════════
+// TYPE CONFIG
+// ══════════════════════════════════════════════════════════
+function typeConfig(t){
+  return{
+    purchase:   {label:'Purchase Invoice',  badge:'bp'},
+    sale:       {label:'Sales',             badge:'bs'},
+    credit:     {label:'Credit',            badge:'bc'},
+    scanback:   {label:'Scanback',          badge:'bk'},
+    outside:    {label:'Outside Supplier',  badge:'bo'},
+    transferin: {label:'Transfer In',       badge:'bti'},
+    transferout:{label:'Transfer Out',      badge:'bto'}
+  }[t]||{label:t,badge:'bp'};
+}
+
+// ══════════════════════════════════════════════════════════
+// FISCAL CALENDAR
+// ══════════════════════════════════════════════════════════
+function getSettings(deptId){
+  return (deptData[deptId] || {}).settings || {targetMargin:30, fiscalYear:new Date().getFullYear()};
+}
+function getFYStart(deptId){
+  const s = getSettings(deptId);
+  const yr = s.fiscalYear || new Date().getFullYear();
+  const feb1 = new Date(yr,1,1), dow = feb1.getDay(), start = new Date(feb1);
+  if(dow!==0) start.setDate(feb1.getDate()-dow);
+  return start;
+}
+function getCal(deptId){
+  const start = getFYStart(deptId), cal = [];
+  for(let p=0;p<PERIODS;p++){
+    const period = {periodIndex:p, weeks:[]};
+    for(let w=0;w<WPP;w++){
+      const ws = new Date(start); ws.setDate(start.getDate()+(p*28)+(w*7));
+      const we = new Date(ws);   we.setDate(ws.getDate()+6);
+      const days=[];
+      for(let d=0;d<7;d++){const day=new Date(ws);day.setDate(ws.getDate()+d);days.push(day);}
+      period.weeks.push({weekIndex:w, weekNum:p*4+w+1, start:ws, end:we, days});
+    }
+    period.start = period.weeks[0].start;
+    period.end   = period.weeks[3].end;
+    cal.push(period);
+  }
+  return cal;
+}
+
+// ══════════════════════════════════════════════════════════
+// HELPERS
+// ══════════════════════════════════════════════════════════
+function dk(d){return d instanceof Date?d.toISOString().slice(0,10):d;}
+function kd(k){const[y,m,d]=k.split('-').map(Number);return new Date(y,m-1,d);}
+function fmt(n){return'$'+(parseFloat(n)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function fmtP(n){return(parseFloat(n)||0).toFixed(2)+'%';}
+function fmtD(d){return d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});}
+function fmtS(d){return d.toLocaleDateString('en-US',{month:'short',day:'numeric'});}
+function mColor(m,t){t=t||30;return m>=t?'green':(m>=t*0.85?'orange':'red');}
+function chipClass(m,t){const c=mColor(m,t);return c==='green'?'g':(c==='orange'?'o':'r');}
+
+function getEntries(deptId){ return Object.values((deptData[deptId]||{}).entries||{}); }
+function getInv(deptId,p){ const inv=((deptData[deptId]||{}).inventory||{})['p'+p]||{}; return{open:parseFloat(inv.open)||0,close:parseFloat(inv.close)||0}; }
+function getBudget(deptId){ return (deptData[deptId]||{}).budget||{salesYear:0,marginPct:0}; }
+function budgetSalesP(deptId){ return (parseFloat(getBudget(deptId).salesYear)||0)/PERIODS; }
+function budgetSalesW(deptId){ return (parseFloat(getBudget(deptId).salesYear)||0)/(PERIODS*WPP); }
+
+function entriesFor(deptId,ds){ return getEntries(deptId).filter(e=>e.date===ds); }
+function entriesRange(deptId,s,e){ const sk=dk(s),ek=dk(e); return getEntries(deptId).filter(x=>x.date>=sk&&x.date<=ek); }
+
+function calcM(entries,oi,ci){
+  let sales=0,purchases=0,credits=0,scanbacks=0,outside=0,transferIn=0,transferOut=0;
+  entries.forEach(e=>{
+    const a=parseFloat(e.amount)||0;
+    if(e.type==='sale')        sales      +=a;
+    if(e.type==='purchase')    purchases  +=a;
+    if(e.type==='credit')      credits    +=a;
+    if(e.type==='scanback')    scanbacks  +=a;
+    if(e.type==='outside')     outside    +=a;
+    if(e.type==='transferin')  transferIn +=a;
+    if(e.type==='transferout') transferOut+=a;
+  });
+  const o=parseFloat(oi)||0,c=parseFloat(ci)||0,hasInv=(o>0||c>0);
+  const netP = purchases+transferIn-transferOut;
+  const basicCost = netP+outside-credits-scanbacks;
+  const trueCOGS  = o+netP+outside-credits-scanbacks-c;
+  const cost = hasInv?trueCOGS:basicCost;
+  const gp = sales-cost, margin = sales>0?(gp/sales)*100:0;
+  return{sales,purchases,credits,scanbacks,outside,transferIn,transferOut,netPurchases:netP,cost,gp,margin,hasInv,openInv:o,closeInv:c,trueCOGS,basicCost};
+}
+
+// ══════════════════════════════════════════════════════════
+// TOAST / MODAL
+// ══════════════════════════════════════════════════════════
+let tid;
+function toast(msg,type=''){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.className='show'+(type?' '+type:'');
+  clearTimeout(tid);tid=setTimeout(()=>t.className='',2800);
+}
+function closeModal(){ document.querySelectorAll('.modal-overlay').forEach(m=>m.classList.remove('open')); }
+
+// ══════════════════════════════════════════════════════════
+// BUILD APP
+// ══════════════════════════════════════════════════════════
+let activePage = '';
+
+function buildApp(isRegularDept, isAdminOrSU){
+  const deptId = session.deptId;
+  const dept   = session.dept;
+  const isSU   = session.isSuperuser;
+  const isAny  = session.isAdmin;
+
+  document.getElementById('sbDeptName').textContent = isSU ? '👁 Superuser' : (isAny ? '⚡ Admin' : (dept.name||'Department'));
+  if(!isSU && !isAny && dept.dual){
+    // Dual tracker - show tracker name in location
+    const isSecondary = session.subDept === 'secondary';
+    document.getElementById('sbLocation').textContent = isSecondary ? '🔵 '+(dept.dual.name2||'Commercial') : '🟢 '+(dept.dual.name1||'Instore');
+  } else {
+    document.getElementById('sbLocation').textContent = isSU ? 'Read-Only View' : (isAny ? 'All Departments' : (dept.location||''));
+  }
+  document.getElementById('sbManager').textContent  = isSU ? 'View Only' : (isAny ? '' : (dept.manager ? '👤 '+dept.manager : ''));
+
+  buildNav(isAny, deptId);
+  buildPages(isAny, deptId);
+
+  if(isAny) showPage('admin_overview');
+  else {
+    const cal = getCal(deptId), today = new Date();
+    let def = 'addentry';
+    for(let p=0;p<cal.length;p++){ if(today>=cal[p].start&&today<=cal[p].end){def='p'+p;break;} }
+    showPage(def);
+  }
+}
+
+function buildNav(isAdmin, deptId){
+  const nav = document.getElementById('sideNav'); nav.innerHTML='';
+  function btn(id,icon,label){
+    const b=document.createElement('button');b.id='nav_'+id;
+    b.innerHTML=icon+' <span class="nav-text">'+label+'</span>';
+    b.onclick=()=>showPage(id);nav.appendChild(b);
+  }
+  function lbl(t){const d=document.createElement('div');d.className='slbl';d.textContent=t;nav.appendChild(d);}
+
+  if(isAdmin){
+    btn('admin_overview','📊','All Depts Overview');
+    if(!session.isSuperuser) btn('admin_depts','🏢','Manage Departments');
+    if(!session.isSuperuser) btn('admin_backup','💾','Backup & Restore');
+    // If viewing as dept, show that dept's nav
+    if(session.viewingAs){
+      lbl('Viewing: '+(allDepts[session.viewingAs]||{}).name);
+      if(!session.isSuperuser) btn('addentry','➕','Add Entry');
+      if(!session.isSuperuser) btn('budget','🎯','Budget');
+      lbl('Periods');
+      for(let p=0;p<PERIODS;p++) btn('p'+p,'📅','Period '+(p+1));
+      lbl('Reports');
+      btn('ytd','📊','Year to Date');
+      if(!session.isSuperuser) btn('settings','⚙️','Settings');
+    }
+  } else {
+    btn('addentry','➕','Add Entry');
+    btn('budget','🎯','Budget');
+    lbl('Periods');
+    for(let p=0;p<PERIODS;p++) btn('p'+p,'📅','Period '+(p+1));
+    lbl('Reports');
+    btn('ytd','📊','Year to Date');
+    btn('settings','⚙️','Settings');
+  }
+}
+
+function buildPages(isAdmin, deptId){
+  const c = document.getElementById('pages'); c.innerHTML='';
+  function mkPage(id,html){ const d=document.createElement('div');d.className='page';d.id='pg_'+id;if(html)d.innerHTML=html;c.appendChild(d);return d; }
+
+  if(isAdmin){
+    mkPage('admin_overview');
+    if(!session.isSuperuser) mkPage('admin_depts', adminDeptsHTML());
+    if(!session.isSuperuser) mkPage('admin_backup', adminBackupHTML());
+    // Also build dept pages if viewing as
+    if(session.viewingAs){
+      if(!session.isSuperuser) mkPage('addentry', addEntryHTML(session.viewingAs));
+      if(!session.isSuperuser) mkPage('budget', budgetHTML(session.viewingAs));
+      for(let p=0;p<PERIODS;p++) mkPage('p'+p);
+      mkPage('ytd');
+      if(!session.isSuperuser) mkPage('settings', settingsHTML(session.viewingAs));
+    }
+  } else {
+    if(!session.isSuperuser) mkPage('addentry', addEntryHTML(deptId));
+    if(!session.isSuperuser) mkPage('budget', budgetHTML(deptId));
+    for(let p=0;p<PERIODS;p++) mkPage('p'+p);
+    mkPage('ytd');
+    if(!session.isSuperuser) mkPage('settings', settingsHTML(deptId));
+  }
+}
+
+function showPage(id){
+  activePage = id;
+  document.querySelectorAll('#sideNav button').forEach(function(b){b.classList.remove('active');});
+  const nb = document.getElementById('nav_'+id); if(nb) nb.classList.add('active');
+  document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});
+  const pg = document.getElementById('pg_'+id); if(pg) pg.classList.add('active');
+
+  const deptId = session.viewingAs || session.deptId;
+  if(id==='admin_overview') renderAdminOverview();
+  else if(id==='admin_depts') renderAdminDepts();
+  else if(id==='admin_backup') renderAdminBackup();
+  else if(id.match(/^p\d+$/)) renderPeriod(deptId, parseInt(id.slice(1)));
+  else if(id==='ytd') renderYTD(deptId);
+  else if(id==='settings') renderSettings(deptId);
+  else if(id==='budget') renderBudgetPage(deptId);
+  else if(id==='addentry') renderRecent(deptId);
+}
+
+// ══════════════════════════════════════════════════════════
+// ADMIN — MANAGE DEPARTMENTS
+// ══════════════════════════════════════════════════════════
+function adminDeptsHTML(){
+  return `<div class="ph"><div><h1>Manage Departments</h1><div class="sub">Add, edit, or remove departments and their PINs</div></div>
+    <button class="btn admin-btn" onclick="openAddDept()">+ Add Department</button>
+  </div>
+  <div id="deptList"></div>`;
+}
+
+function renderAdminDepts(){
+  const c = document.getElementById('deptList'); if(!c) return;
+  const deps = Object.entries(allDepts);
+  if(!deps.length){ c.innerHTML='<div class="empty">No departments yet. Click "Add Department" to get started.</div>'; return; }
+  c.innerHTML = `<div class="dept-grid">${deps.map(([id,d])=>`
+    <div class="dept-card">
+      <div class="dc-name">${d.name}</div>
+      <div class="dc-loc">📍 ${d.location||'—'}</div>
+      <div class="dc-mgr">👤 ${d.manager||'—'}</div>
+      <div class="dc-stats">
+        <div class="dc-stat"><div class="dcl">PIN</div><div class="dcv" style="font-size:18px;letter-spacing:3px">••••••</div></div>
+      </div>
+      <div class="dc-actions">
+        <button class="btn sm primary" onclick="viewAsDept('${id}')">👁 View Data</button>
+        <button class="btn sm" onclick="openEditDept('${id}')">✏️ Edit</button>
+        <button class="btn sm danger" onclick="confirmDeleteDept('${id}')">🗑</button>
+      </div>
+    </div>`).join('')}</div>`;
+}
+
+let editingDeptId = null;
+function openAddDept(){
+  editingDeptId = null;
+  document.getElementById('deptModalTitle').textContent = 'Add Department';
+  document.getElementById('dmName').value = '';
+  document.getElementById('dmLoc').value  = '';
+  document.getElementById('dmMgr').value  = '';
+  document.getElementById('dmPin').value  = '';
+  document.getElementById('dmDual').checked = false;
+  document.getElementById('dmDualNames').style.display = 'none';
+  document.getElementById('dmTracker1').value = 'Instore';
+  document.getElementById('dmTracker2').value = 'Commercial';
+  document.getElementById('confirmDept').textContent = 'Add Department';
+  document.getElementById('deptModal').classList.add('open');
+  document.getElementById('dmDual').onchange = function(){ document.getElementById('dmDualNames').style.display = this.checked ? 'block' : 'none'; };
+}
+function openEditDept(id){
+  editingDeptId = id;
+  const d = allDepts[id]||{};
+  document.getElementById('deptModalTitle').textContent = 'Edit Department';
+  document.getElementById('dmName').value = d.name||'';
+  document.getElementById('dmLoc').value  = d.location||'';
+  document.getElementById('dmMgr').value  = d.manager||'';
+  document.getElementById('dmPin').value  = d.pin||'';
+  const hasDual = !!(d.dual);
+  document.getElementById('dmDual').checked = hasDual;
+  document.getElementById('dmDualNames').style.display = hasDual ? 'block' : 'none';
+  document.getElementById('dmTracker1').value = (d.dual&&d.dual.name1)||'Instore';
+  document.getElementById('dmTracker2').value = (d.dual&&d.dual.name2)||'Commercial';
+  document.getElementById('confirmDept').textContent = 'Save Changes';
+  document.getElementById('deptModal').classList.add('open');
+  document.getElementById('dmDual').onchange = function(){ document.getElementById('dmDualNames').style.display = this.checked ? 'block' : 'none'; };
+}
+document.getElementById('confirmDept').onclick = () => {
+  const name = document.getElementById('dmName').value.trim();
+  const loc  = document.getElementById('dmLoc').value.trim();
+  const mgr  = document.getElementById('dmMgr').value.trim();
+  const pin  = document.getElementById('dmPin').value.trim();
+  const isDual = document.getElementById('dmDual').checked;
+  const t1 = document.getElementById('dmTracker1').value.trim() || 'Instore';
+  const t2 = document.getElementById('dmTracker2').value.trim() || 'Commercial';
+  if(!name){ toast('Department name is required','error'); return; }
+  if(!/^\d{6}$/.test(pin)){ toast('PIN must be exactly 6 digits','error'); return; }
+  if(pin === ADMIN_PIN){ toast('That PIN is reserved for admin','error'); return; }
+  if(pin === _superuserPin){ toast('That PIN is reserved for superuser','error'); return; }
+  const dup = Object.entries(allDepts).find(([id,d])=> d.pin===pin && id!==editingDeptId);
+  if(dup){ toast('PIN already used by: '+dup[1].name,'error'); return; }
+  const id = editingDeptId || 'dept_' + Date.now();
+  const deptObj = {name, location:loc, manager:mgr, pin};
+  if(isDual) deptObj.dual = {name1:t1, name2:t2};
+  saveDept(id, deptObj);
+  toast(editingDeptId ? 'Department updated' : 'Department added', 'success');
+  closeModal();
+};
+
+function confirmDeleteDept(id){
+  const d = allDepts[id];
+  if(!confirm('Delete department "' + (d?d.name:id) + '" and ALL its data? This cannot be undone.')) return;
+  deleteDept(id);
+  toast('Department deleted','error');
+}
+
+function viewAsDept(deptId){
+  session.viewingAs = deptId;
+  loadDeptData(deptId, () => {
+    // Rebuild nav and pages with dept context
+    buildNav(true, deptId);
+    const c = document.getElementById('pages');
+    // Remove old dept pages
+    ['addentry','budget','ytd','settings'].forEach(id=>{ const el=document.getElementById('pg_'+id); if(el)el.remove(); });
+    for(let p=0;p<PERIODS;p++){ const el=document.getElementById('pg_p'+p); if(el)el.remove(); }
+    // Add new pages
+    function mkPage(id,html){ const d=document.createElement('div');d.className='page';d.id='pg_'+id;if(html)d.innerHTML=html;c.appendChild(d);return d; }
+    if(!session.isSuperuser) mkPage('addentry', addEntryHTML(deptId));
+    if(!session.isSuperuser) mkPage('budget', budgetHTML(deptId));
+    for(let p=0;p<PERIODS;p++) mkPage('p'+p);
+    mkPage('ytd');
+    if(!session.isSuperuser) mkPage('settings', settingsHTML(deptId));
+    // Update sidebar header
+    const d = allDepts[deptId]||{};
+    document.getElementById('sbDeptName').textContent = '⚡ Admin → '+d.name;
+    document.getElementById('sbLocation').textContent = d.location||'';
+    document.getElementById('sbManager').textContent  = d.manager?'👤 '+d.manager:'';
+    showPage('addentry');
+    toast('Viewing '+d.name,'success');
+  });
+}
+
+// ══════════════════════════════════════════════════════════
+// ADMIN OVERVIEW
+// ══════════════════════════════════════════════════════════
+function renderAdminOverview(){
+  const c = document.getElementById('pg_admin_overview'); if(!c) return;
+  const deps = Object.entries(allDepts);
+  if(!deps.length){
+    c.innerHTML='<div class="ph"><div><h1>All Departments Overview</h1><div class="sub">No departments set up yet.</div></div></div><div class="infobox">Go to Manage Departments to add your first department.</div>';
+    return;
+  }
+  let totalSales=0,totalGP=0,totalCost=0;
+  const rows = deps.map(([id,d])=>{
+    const cal=getCal(id);
+    let sales=0,gp=0,cost=0;
+    cal.forEach((period,p)=>{
+      const inv=getInv(id,p),pe=entriesRange(id,period.start,period.end),ps=calcM(pe,inv.open,inv.close);
+      sales+=ps.sales;gp+=ps.gp;cost+=ps.cost;
+    });
+    const margin=sales>0?(gp/sales)*100:0;
+    const bud=getBudget(id),budSalesY=parseFloat(bud.salesYear)||0,budM=parseFloat(bud.marginPct)||0;
+    const sDiff=sales-budSalesY,mDiff=margin-budM;
+    totalSales+=sales;totalGP+=gp;totalCost+=cost;
+    const s=getSettings(id),t=s.targetMargin||30;
+    return{id,name:d.name,location:d.location,manager:d.manager,sales,gp,cost,margin,budSalesY,budM,sDiff,mDiff,t};
+  });
+  const totalMargin=totalSales>0?(totalGP/totalSales)*100:0;
+
+  let html='<div class="ph"><div><h1>All Departments Overview</h1>';
+  html+='<div class="sub">Combined YTD performance across '+deps.length+' departments</div></div>';
+  if(!session.isSuperuser){
+    html+='<button class="btn admin-btn" onclick="showPage(\'admin_depts\')">&#127962; Manage Depts</button>';
+    html+='<button class="btn" style="background:#e0f2f1;color:#00695c;border-color:#00897b;margin-left:8px" onclick="openSuperuserPinModal()">&#128273; Superuser PIN</button>';
+  }
+  html+='</div>';
+  html+=session.isSuperuser
+    ?'<div class="superuser-badge">&#128065; Superuser &mdash; Read-Only View</div>'
+    :'<div class="admin-badge">&#9889; Admin Access</div>';
+
+  html+='<div class="mgrid">';
+  html+='<div class="mtile"><div class="lbl">Total Sales</div><div class="val blue">'+fmt(totalSales)+'</div></div>';
+  html+='<div class="mtile"><div class="lbl">Total COGS</div><div class="val orange">'+fmt(totalCost)+'</div></div>';
+  html+='<div class="mtile"><div class="lbl">Total Gross Profit</div><div class="val '+(totalGP>=0?'green':'red')+'">'+fmt(totalGP)+'</div></div>';
+  html+='<div class="mtile"><div class="lbl">Blended Margin %</div><div class="val '+mColor(totalMargin)+'">'+fmtP(totalMargin)+'</div></div>';
+  html+='<div class="mtile"><div class="lbl">Departments</div><div class="val purple">'+deps.length+'</div></div>';
+  html+='</div>';
+
+  // Dept cards
+  html+='<div class="dept-grid">';
+  rows.forEach(function(r){
+    const cc=chipClass(r.margin,r.t);
+    html+='<div class="dept-card">';
+    html+='<div class="dc-name">'+r.name+(r.dual?' <span style="font-size:10px;background:#e8f0fe;color:#1557b0;padding:2px 6px;border-radius:8px;font-weight:700">Dual</span>':'')+'</div>';
+    html+='<div class="dc-loc">&#128205; '+(r.location||'&mdash;')+'</div>';
+    html+='<div class="dc-mgr">&#128100; '+(r.manager||'&mdash;')+'</div>';
+    html+='<div class="dc-stats">';
+    html+='<div class="dc-stat"><div class="dcl">Sales YTD</div><div class="dcv blue">'+fmt(r.sales)+'</div></div>';
+    html+='<div class="dc-stat"><div class="dcl">GP YTD</div><div class="dcv '+(r.gp>=0?'green':'red')+'">'+fmt(r.gp)+'</div></div>';
+    html+='<div class="dc-stat"><div class="dcl">Margin</div><div class="dcv"><span class="chip '+cc+'">'+fmtP(r.margin)+'</span></div></div>';
+    html+='</div>';
+    if(r.budSalesY>0){
+      html+='<div style="font-size:11px;color:var(--text2);margin-bottom:8px">';
+      html+='Sales vs Budget: <span class="bdiff '+(r.sDiff>=0?'up':'down')+'">'+(r.sDiff>=0?'+':'')+fmt(r.sDiff)+'</span>';
+      html+=' &nbsp; Margin vs Budget: <span class="bdiff '+(r.mDiff>=0?'up':'down')+'">'+(r.mDiff>=0?'+':'')+r.mDiff.toFixed(2)+'%</span>';
+      html+='</div>';
+    }
+    html+='<div class="dc-actions"><button class="btn sm primary" onclick="viewAsDept(\"'+r.id+'\")">👁 View Full Data</button></div>';
+    html+='</div>';
+  });
+  html+='</div>';
+
+  // Comparison table
+  html+='<div class="card"><h2>Department Comparison Table</h2><div class="tw"><table>';
+  html+='<thead><tr><th>Department</th><th>Location</th><th>Manager</th><th>Sales YTD</th><th>COGS YTD</th><th>GP YTD</th><th>Margin %</th><th>Bud Margin</th><th>Margin Diff</th><th>Action</th></tr></thead><tbody>';
+  rows.forEach(function(r){
+    const cc=chipClass(r.margin,r.t);
+    html+='<tr>';
+    html+='<td><strong>'+r.name+'</strong></td>';
+    html+='<td style="color:var(--text2)">'+(r.location||'&mdash;')+'</td>';
+    html+='<td style="color:var(--text2)">'+(r.manager||'&mdash;')+'</td>';
+    html+='<td>'+fmt(r.sales)+'</td><td>'+fmt(r.cost)+'</td><td>'+fmt(r.gp)+'</td>';
+    html+='<td>'+(r.sales>0?'<span class="chip '+cc+'">'+fmtP(r.margin)+'</span>':'&mdash;')+'</td>';
+    html+='<td>'+(r.budM>0?fmtP(r.budM):'&mdash;')+'</td>';
+    html+='<td>'+(r.budM>0?'<span class="bdiff '+(r.mDiff>=0?'up':'down')+'">'+(r.mDiff>=0?'+':'')+r.mDiff.toFixed(2)+'%</span>':'&mdash;')+'</td>';
+    html+='<td><button class="btn sm primary" onclick="viewAsDept(\"'+r.id+'\")">View</button></td>';
+    html+='</tr>';
+  });
+  const ytdOvM=totalSales>0?(totalGP/totalSales)*100:0;
+  html+='<tr style="font-weight:700;background:#f8f9fa;border-top:2px solid var(--border)">';
+  html+='<td colspan="3">TOTAL (All Departments)</td>';
+  html+='<td>'+fmt(totalSales)+'</td><td>'+fmt(totalCost)+'</td><td>'+fmt(totalGP)+'</td>';
+  html+='<td><span class="chip '+chipClass(ytdOvM)+'">'+fmtP(ytdOvM)+'</span></td>';
+  html+='<td colspan="3"></td></tr>';
+  html+='</tbody></table></div></div>';
+
+  c.innerHTML=html;
+}
+// ══════════════════════════════════════════════════════════
+// ADD ENTRY PAGE
+// ══════════════════════════════════════════════════════════
+function getDualToggleBar(deptId){
+  var dept = allDepts[deptId]||{};
+  if(!dept.dual) return '';
+  var n1 = dept.dual.name1||'Instore', n2 = dept.dual.name2||'Commercial';
+  var isPrimary = session.subDept !== 'secondary';
+  return '<div class="dual-toggle-bar">'+
+    '<div><div class="dt-label">'+dept.name+' Margin Tracker</div>'+
+    '<div class="dt-sub">Currently viewing: '+(isPrimary?n1:n2)+'</div></div>'+
+    '<div class="dt-switch">'+
+    '<button class="'+(isPrimary?'dt-active':'dt-inactive')+'" onclick="switchTracker(\'primary\')">&#127922; '+n1+'</button>'+
+    '<button class="'+(!isPrimary?'dt-active':'dt-inactive')+'" onclick="switchTracker(\'secondary\')">&#128309; '+n2+'</button>'+
+    '</div></div>';
+}
+
+function addEntryHTML(deptId){
+  return`${getDualToggleBar(deptId)}<div class="ph"><div><h1>Add Entry</h1><div class="sub">Record purchases, sales, credits, scanbacks, outside supplier &amp; transfers</div></div></div>
+  <div class="card"><h2>New Entry</h2>
+  <div class="formula-box">
+    <strong>Net Purchases</strong> = Purchases + Transfer In − Transfer Out &nbsp;|&nbsp;
+    <strong>COGS</strong> = Open Inv + Net Purch + Outside − Credits − Scanbacks − Close Inv &nbsp;|&nbsp;
+    <strong>Margin %</strong> = (Sales − COGS) ÷ Sales × 100
+  </div>
+  <div class="fgrid">
+    <div class="fg"><label>Date *</label><input type="date" id="eDate"></div>
+    <div class="fg"><label>Type *</label>
+      <select id="eType">
+        <option value="purchase">Purchase Invoice</option><option value="sale">Sales</option>
+        <option value="credit">Credit</option><option value="scanback">Scanback</option>
+        <option value="outside">Outside Supplier Invoice</option>
+        <option value="transferin">🔵 Transfer In (adds to purchases)</option>
+        <option value="transferout">🔴 Transfer Out (reduces purchases)</option>
+      </select>
+    </div>
+    <div class="fg"><label>Amount ($) *</label><input type="number" id="eAmt" step="0.01" min="0" placeholder="0.00"></div>
+    <div class="fg"><label>Description / Invoice # / Dept</label><input type="text" id="eDesc" placeholder="Optional"></div>
+  </div>
+  <div class="bg">
+    <button class="btn primary" onclick="addEntry()">Add Entry</button>
+    <button class="btn" onclick="clearEntryForm()">Clear</button>
+  </div></div>
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+      <h2 style="margin:0">Recent Entries</h2>
+      <div style="display:flex;gap:7px;flex-wrap:wrap;align-items:flex-end">
+        <div class="fg"><label>Type</label><select id="fType" onchange="renderRecent(getActiveDeptId())" style="width:auto">
+          <option value="">All</option><option value="purchase">Purchase</option><option value="sale">Sale</option>
+          <option value="credit">Credit</option><option value="scanback">Scanback</option>
+          <option value="outside">Outside Supplier</option>
+          <option value="transferin">Transfer In</option><option value="transferout">Transfer Out</option>
+        </select></div>
+        <div class="fg"><label>From</label><input type="date" id="fFrom" onchange="renderRecent(getActiveDeptId())" style="width:auto"></div>
+        <div class="fg"><label>To</label><input type="date" id="fTo" onchange="renderRecent(getActiveDeptId())" style="width:auto"></div>
+      </div>
+    </div>
+    <div id="recentTbl"></div>
+  </div>`;
+}
+
+function getCurrDeptId(){ return session.viewingAs || session.deptId; }
+
+// For dual-tracker depts: returns the active tracker's data ID
+function getActiveDeptId(){
+  var baseId = getCurrDeptId();
+  if(session.subDept === 'secondary') return baseId + '_commercial';
+  return baseId;
+}
+
+// Check if current dept has dual tracker
+function isDualDept(){
+  var baseId = getCurrDeptId();
+  var dept = allDepts[baseId] || {};
+  return !!(dept.dual);
+}
+
+// Get tracker names for current dept
+function getDualNames(){
+  var baseId = getCurrDeptId();
+  var dept = allDepts[baseId] || {};
+  if(!dept.dual) return null;
+  return { name1: dept.dual.name1||'Instore', name2: dept.dual.name2||'Commercial' };
+}
+
+// Switch between trackers
+function switchTracker(which){
+  session.subDept = which;
+  // Rebuild pages with new active tracker
+  const deptId = getCurrDeptId();
+  buildPages(false, deptId);
+  const cal = getCal(deptId), today = new Date();
+  let def = 'addentry';
+  for(let p=0;p<cal.length;p++){ if(today>=cal[p].start&&today<=cal[p].end){def='p'+p;break;} }
+  showPage(def);
+  // Update sidebar header
+  updateSidebarForDual();
+}
+
+function updateSidebarForDual(){
+  const toggleDiv = document.getElementById('sbDualToggle');
+  const btn1 = document.getElementById('dtBtn1');
+  const btn2 = document.getElementById('dtBtn2');
+  if(!toggleDiv || !btn1 || !btn2) return;
+
+  if(!isDualDept() || session.isAdmin){
+    toggleDiv.style.display = 'none';
+    return;
+  }
+  const names = getDualNames();
+  if(!names){ toggleDiv.style.display='none'; return; }
+
+  const isSecondary = session.subDept === 'secondary';
+  const dept = allDepts[getCurrDeptId()]||{};
+
+  // Show toggle in sidebar
+  toggleDiv.style.display = 'flex';
+  btn1.textContent = '🟢 ' + names.name1;
+  btn2.textContent = '🔵 ' + names.name2;
+  btn1.className = isSecondary ? 'dt-off' : 'dt-on';
+  btn2.className = isSecondary ? 'dt-on' : 'dt-off';
+
+  // Update location to show current tracker
+  document.getElementById('sbDeptName').textContent = dept.name||'Department';
+  document.getElementById('sbLocation').textContent = isSecondary ? '🔵 '+names.name2 : '🟢 '+names.name1;
+}
+
+function addEntry(){
+  const deptId = getActiveDeptId();
+  const date   = document.getElementById('eDate').value;
+  const type   = document.getElementById('eType').value;
+  const amount = parseFloat(document.getElementById('eAmt').value);
+  const desc   = document.getElementById('eDesc').value.trim();
+  if(!date){ toast('Please select a date','error'); return; }
+  if(!amount||amount<=0){ toast('Please enter a valid amount','error'); return; }
+  const id = 'e_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
+  saveEntry(deptId, {id, date, type, amount, desc});
+  clearEntryForm();
+  toast('Entry saved','success');
+}
+function clearEntryForm(){
+  document.getElementById('eDate').value = dk(new Date());
+  document.getElementById('eAmt').value  = '';
+  document.getElementById('eDesc').value = '';
+}
+
+function renderRecent(deptId){
+  const c = document.getElementById('recentTbl'); if(!c) return;
+  // Dual tracker: use active sub-dept
+  const activeDeptId = (isDualDept() && !session.isAdmin) ? getActiveDeptId() : deptId;
+  let entries = getEntries(activeDeptId);
+  const ft  = document.getElementById('fType')?.value;
+  const ff  = document.getElementById('fFrom')?.value;
+  const ft2 = document.getElementById('fTo')?.value;
+  if(ft)  entries = entries.filter(e=>e.type===ft);
+  if(ff)  entries = entries.filter(e=>e.date>=ff);
+  if(ft2) entries = entries.filter(e=>e.date<=ft2);
+  entries.sort((a,b)=>a.date>b.date?-1:1);
+  const show = entries.slice(0,100);
+  const cal  = getCal(deptId);
+  function pw(entry){ const ed=kd(entry.date); for(let p=0;p<cal.length;p++) for(let w=0;w<cal[p].weeks.length;w++){const wk=cal[p].weeks[w];if(ed>=wk.start&&ed<=wk.end)return'P'+(p+1)+' W'+(w+1);} return'—'; }
+  if(!show.length){ c.innerHTML='<div class="empty">No entries yet.</div>'; return; }
+  c.innerHTML=`<div class="tw"><table>
+    <thead><tr><th>Date</th><th>Type</th><th>Amount</th><th>Description</th><th>Period/Week</th><th>Actions</th></tr></thead>
+    <tbody>${show.map(e=>{ const cfg=typeConfig(e.type); return`<tr>
+      <td>${e.date}</td><td><span class="badge ${cfg.badge}">${cfg.label}</span></td>
+      <td><strong>${fmt(e.amount)}</strong></td>
+      <td style="color:var(--text2)">${e.desc||'—'}</td>
+      <td>${pw(e)}</td>
+      <td>
+        <button class="btn sm" onclick="openEditEntry('${deptId}','${e.id}')">✏️</button>
+        <button class="btn sm danger" style="margin-left:3px" onclick="openDelEntry('${deptId}','${e.id}')">🗑</button>
+      </td>
+    </tr>`; }).join('')}</tbody>
+  </table></div>`;
+}
+
+let pendingDelDept=null,pendingDelEntry=null;
+function openDelEntry(deptId,entryId){
+  pendingDelDept=deptId;pendingDelEntry=entryId;
+  document.getElementById('delModal').classList.add('open');
+}
+document.getElementById('confirmDel').onclick=()=>{
+  if(pendingDelEntry){ deleteEntry(pendingDelDept,pendingDelEntry); toast('Entry deleted','error'); }
+  closeModal();
+};
+
+let pendingEditDept=null,pendingEditEntry=null;
+function openEditEntry(deptId,entryId){
+  const entries = getEntries(deptId);
+  const e = entries.find(x=>x.id===entryId); if(!e) return;
+  pendingEditDept=deptId;pendingEditEntry=entryId;
+  document.getElementById('editDate').value=e.date;
+  document.getElementById('editType').value=e.type;
+  document.getElementById('editAmt').value=e.amount;
+  document.getElementById('editDesc').value=e.desc||'';
+  document.getElementById('editModal').classList.add('open');
+}
+document.getElementById('confirmEdit').onclick=()=>{
+  if(pendingEditEntry){
+    const updated={id:pendingEditEntry,date:document.getElementById('editDate').value,type:document.getElementById('editType').value,amount:parseFloat(document.getElementById('editAmt').value)||0,desc:document.getElementById('editDesc').value};
+    saveEntry(pendingEditDept,updated);toast('Entry updated','success');
+  }
+  closeModal();
+};
+
+// ══════════════════════════════════════════════════════════
+// BUDGET PAGE
+// ══════════════════════════════════════════════════════════
+function budgetHTML(deptId){
+  return`<div class="ph"><div><h1>Annual Budget</h1><div class="sub">Set your yearly sales and margin targets</div></div></div>
+  <div class="card"><h2>Budget Targets</h2>
+  <div class="infobox">💡 Budget is split equally across all 13 periods and 52 weeks automatically.</div>
+  <div class="fgrid" style="max-width:480px">
+    <div class="fg"><label>Annual Sales Budget ($)</label><input type="number" id="bSales" step="100" min="0" placeholder="e.g. 2600000"></div>
+    <div class="fg"><label>Budgeted Margin %</label><input type="number" id="bMargin" step="0.1" min="0" max="100" placeholder="e.g. 32.5"></div>
+  </div>
+  <div class="bg" style="margin-bottom:14px"><button class="btn primary" onclick="saveBudget('${deptId}')">Save Budget</button></div>
+  <div class="divider"></div>
+  <div id="budgetPreview"></div></div>`;
+}
+function renderBudgetPage(deptId){
+  if(isDualDept() && !session.isAdmin) deptId = getActiveDeptId();
+  const bud=getBudget(deptId);
+  const bs=document.getElementById('bSales'),bm=document.getElementById('bMargin');
+  if(bs)bs.value=bud.salesYear||'';
+  if(bm)bm.value=bud.marginPct||'';
+  renderBudgetPreview(deptId);
+}
+function saveBudget(deptId){
+  const s=parseFloat(document.getElementById('bSales')?.value)||0;
+  const m=parseFloat(document.getElementById('bMargin')?.value)||0;
+  if(!deptData[deptId])deptData[deptId]={entries:{},inventory:{},budget:{},settings:{}};
+  deptData[deptId].budget={salesYear:s,marginPct:m};
+  saveDeptField(deptId,'budget',{salesYear:s,marginPct:m});
+  toast('Budget saved','success');
+}
+function renderBudgetPreview(deptId){
+  const c=document.getElementById('budgetPreview');if(!c)return;
+  if(isDualDept() && !session.isAdmin) deptId = getActiveDeptId();
+  const bud=getBudget(deptId);
+  const by=parseFloat(bud.salesYear)||0,bm=parseFloat(bud.marginPct)||0;
+  if(!by&&!bm){c.innerHTML='<p style="color:var(--text2);font-size:13px">Enter your budget above and click Save.</p>';return;}
+  const bp=by/PERIODS,bw=by/(PERIODS*WPP),bgpY=by*(bm/100),bgpP=bp*(bm/100);
+  c.innerHTML=`<div class="mgrid">
+    <div class="mtile"><div class="lbl">Annual Sales Budget</div><div class="val blue">${fmt(by)}</div></div>
+    <div class="mtile"><div class="lbl">Per Period (÷13)</div><div class="val blue">${fmt(bp)}</div></div>
+    <div class="mtile"><div class="lbl">Per Week (÷52)</div><div class="val blue">${fmt(bw)}</div></div>
+    <div class="mtile"><div class="lbl">Budgeted Margin %</div><div class="val green">${fmtP(bm)}</div></div>
+    <div class="mtile"><div class="lbl">Budgeted GP / Year</div><div class="val green">${fmt(bgpY)}</div></div>
+    <div class="mtile"><div class="lbl">Budgeted GP / Period</div><div class="val green">${fmt(bgpP)}</div></div>
+  </div>`;
+}
+
+// ══════════════════════════════════════════════════════════
+// PERIOD PAGE
+// ══════════════════════════════════════════════════════════
+function renderPeriod(deptId,p){
+  const c=document.getElementById('pg_p'+p);if(!c)return;
+  const cal=getCal(deptId),period=cal[p],today=dk(new Date());
+  // activeDeptId must be defined FIRST
+  const activeDeptId=(isDualDept()&&!session.isAdmin)?getActiveDeptId():deptId;
+  const inv=getInv(activeDeptId,p),pe=entriesRange(activeDeptId,period.start,period.end),ps=calcM(pe,inv.open,inv.close);
+  const bud=getBudget(activeDeptId),budSales=budgetSalesP(activeDeptId),budM=parseFloat(bud.marginPct)||0;
+  const budGP=budSales*(budM/100),hasBudget=(budSales>0||budM>0);
+  const s=getSettings(deptId),t=s.targetMargin||30;
+  const pmClass=mColor(ps.margin,t)==='green'?'good':(mColor(ps.margin,t)==='orange'?'warn':'bad');
+  const dayNames=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],dash='<span style="color:#ccc">—</span>';
+
+  let html=`<div class="ph"><div><h1>Period ${p+1}</h1><div class="sub">${fmtD(period.start)} — ${fmtD(period.end)}</div></div>
+    <button class="btn sm" onclick="exportPeriod('${deptId}',${p})">⬇ CSV</button>
+  </div>`;
+
+  html+=`<div class="pmbanner ${pmClass}">
+    <div><div class="pmt">Period ${p+1} Margin ${ps.hasInv?'(True — with Inventory)':'(No inventory entered)'}</div>
+    <div class="pms">${fmtD(period.start)} — ${fmtD(period.end)}</div></div>
+    <div style="text-align:right"><div class="pmv">${fmtP(ps.margin)}</div>
+    <div class="pmd">GP: ${fmt(ps.gp)} &nbsp;|&nbsp; Sales: ${fmt(ps.sales)}</div></div>
+  </div>`;
+
+  if(hasBudget){
+    const sd=ps.sales-budSales,md=ps.margin-budM,gd=ps.gp-budGP;
+    html+=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:14px">
+      <div class="btile"><div class="blbl">Sales vs Budget</div><div class="brow"><span class="bact">${fmt(ps.sales)}</span><span class="bbud">Bud: ${fmt(budSales)}</span></div>
+        <span class="bdiff ${sd>=0?'up':'down'}">${sd>=0?'+':''}${fmt(sd)} (${sd>=0?'+':''}${budSales>0?((sd/budSales)*100).toFixed(1):'0.0'}%)</span></div>
+      <div class="btile"><div class="blbl">Margin % vs Budget</div><div class="brow"><span class="bact" style="color:var(--${mColor(ps.margin,t)==='green'?'success':'danger'})">${fmtP(ps.margin)}</span><span class="bbud">Bud: ${fmtP(budM)}</span></div>
+        <span class="bdiff ${md>=0?'up':'down'}">${md>=0?'+':''}${md.toFixed(2)}%</span></div>
+      <div class="btile"><div class="blbl">Gross Profit vs Budget</div><div class="brow"><span class="bact">${fmt(ps.gp)}</span><span class="bbud">Bud: ${fmt(budGP)}</span></div>
+        <span class="bdiff ${gd>=0?'up':'down'}">${gd>=0?'+':''}${fmt(gd)}</span></div>
+    </div>`;
+  }
+
+  html+=`<div class="mgrid">
+    <div class="mtile"><div class="lbl">Period Sales</div><div class="val blue">${fmt(ps.sales)}</div></div>
+    <div class="mtile"><div class="lbl">Purchases</div><div class="val orange">${fmt(ps.purchases)}</div></div>
+    <div class="mtile"><div class="lbl">Transfer In</div><div class="val orange">${fmt(ps.transferIn)}</div></div>
+    <div class="mtile"><div class="lbl">Transfer Out</div><div class="val green">${fmt(ps.transferOut)}</div></div>
+    <div class="mtile"><div class="lbl">Net Purchases</div><div class="val orange">${fmt(ps.netPurchases)}</div></div>
+    <div class="mtile"><div class="lbl">Outside Supplier</div><div class="val orange">${fmt(ps.outside)}</div></div>
+    <div class="mtile"><div class="lbl">Credits</div><div class="val green">${fmt(ps.credits)}</div></div>
+    <div class="mtile"><div class="lbl">Scanbacks</div><div class="val green">${fmt(ps.scanbacks)}</div></div>
+    <div class="mtile"><div class="lbl">${ps.hasInv?'True COGS':'Cost'}</div><div class="val orange">${fmt(ps.cost)}</div></div>
+    <div class="mtile"><div class="lbl">Gross Profit</div><div class="val ${ps.gp>=0?'green':'red'}">${fmt(ps.gp)}</div></div>
+    <div class="mtile"><div class="lbl">Margin %</div><div class="val ${mColor(ps.margin,t)}">${fmtP(ps.margin)}</div><div class="sub">Target: ${t}%</div></div>
+  </div>`;
+
+  html+=`<div class="inv-card"><h3>📦 Period Inventory (for True Margin)</h3>
+    <div class="inv-grid">
+      <div class="fg"><label>Opening Inventory ($)</label><input type="number" id="inv_open_${p}" step="0.01" min="0" placeholder="0.00" value="${inv.open||''}" onchange="saveInv('${deptId}',${p})"></div>
+      <div class="fg"><label>Closing Inventory ($)</label><input type="number" id="inv_close_${p}" step="0.01" min="0" placeholder="0.00" value="${inv.close||''}" onchange="saveInv('${deptId}',${p})"></div>
+    </div>
+    ${ps.hasInv?`<p style="font-size:11px;color:#795548;margin-top:7px">COGS = ${fmt(inv.open)} + ${fmt(ps.netPurchases)} (net purch) + ${fmt(ps.outside)} − ${fmt(ps.credits)} − ${fmt(ps.scanbacks)} − ${fmt(inv.close)} = <strong>${fmt(ps.trueCOGS)}</strong></p>`
+    :`<p style="font-size:11px;color:#795548;margin-top:7px">Enter opening and closing inventory to calculate true margin.</p>`}
+  </div>`;
+
+  for(let w=0;w<WPP;w++){
+    const week=period.weeks[w],we=entriesRange(activeDeptId,week.start,week.end),ws=calcM(we);
+    const budW=budgetSalesW(activeDeptId),wBudGP=budW*(budM/100),wmc=mColor(ws.margin,t);
+    html+=`<div class="wh">
+      <div><div class="wt">Week ${w+1} · <span style="font-size:11px;font-weight:400">Overall Week #${week.weekNum}</span></div>
+      <div class="wd">${fmtS(week.start)} — ${fmtS(week.end)} (ends Saturday)</div></div>
+      <div class="ws">
+        <div class="wsl"><div class="wll">Sales</div><div class="wvl blue">${fmt(ws.sales)}</div>${hasBudget?`<div style="font-size:9px;color:#9aa0a6">Bud:${fmt(budW)}</div>`:''}</div>
+        <div class="wsl"><div class="wll">Net Purch</div><div class="wvl" style="color:#f9ab00">${fmt(ws.netPurchases)}</div></div>
+        <div class="wsl"><div class="wll">GP</div><div class="wvl ${ws.gp>=0?'green':'red'}">${fmt(ws.gp)}</div>${hasBudget?`<div style="font-size:9px;color:#9aa0a6">Bud:${fmt(wBudGP)}</div>`:''}</div>
+        <div class="wsl"><div class="wll">Margin</div><div class="wvl ${ws.sales>0?wmc:''}">${ws.sales>0?fmtP(ws.margin):'—'}</div>${hasBudget?`<div style="font-size:9px;color:#9aa0a6">Bud:${fmtP(budM)}</div>`:''}</div>
+        ${hasBudget&&ws.sales>0?`<div class="wsl"><div class="wll">Sales Diff</div><div class="wvl ${ws.sales>=budW?'green':'red'}">${ws.sales>=budW?'+':''}${fmt(ws.sales-budW)}</div></div>`:''}
+      </div>
+    </div>
+    <div class="card" style="padding:0;overflow:hidden;margin-bottom:18px"><div class="tw"><table>
+      <thead><tr><th>Day</th><th>Date</th><th>Sales</th><th>Purchases</th><th>Trsf In</th><th>Trsf Out</th><th>Net Purch</th><th>Outside</th><th>Credits</th><th>Scanbacks</th><th>Cost</th><th>GP</th><th>Margin %</th><th>Entries</th></tr></thead>
+      <tbody>`;
+    let rS=0,rP=0,rTI=0,rTO=0,rO=0,rC=0,rSc=0;
+    week.days.forEach((day,di)=>{
+      const ds=dk(day),de=entriesFor(activeDeptId,ds),dss=calcM(de);
+      rS+=dss.sales;rP+=dss.purchases;rTI+=dss.transferIn;rTO+=dss.transferOut;rO+=dss.outside;rC+=dss.credits;rSc+=dss.scanbacks;
+      const isT=ds===today,isSat=di===6,rc=isT?'tod':(isSat?'sat':''),dmc=mColor(dss.margin,t);
+      html+=`<tr class="${rc}">
+        <td><strong>${dayNames[di]}</strong></td><td>${fmtS(day)}</td>
+        <td>${dss.sales>0?fmt(dss.sales):dash}</td><td>${dss.purchases>0?fmt(dss.purchases):dash}</td>
+        <td>${dss.transferIn>0?`<span style="color:#006064">${fmt(dss.transferIn)}</span>`:dash}</td>
+        <td>${dss.transferOut>0?`<span style="color:#880e4f">${fmt(dss.transferOut)}</span>`:dash}</td>
+        <td>${dss.netPurchases!==0?fmt(dss.netPurchases):dash}</td>
+        <td>${dss.outside>0?fmt(dss.outside):dash}</td>
+        <td>${dss.credits>0?fmt(dss.credits):dash}</td>
+        <td>${dss.scanbacks>0?fmt(dss.scanbacks):dash}</td>
+        <td>${dss.cost!==0?fmt(dss.cost):dash}</td>
+        <td>${dss.gp!==0?fmt(dss.gp):dash}</td>
+        <td>${dss.sales>0?`<span class="chip ${chipClass(dss.margin,t)}">${fmtP(dss.margin)}</span>`:dash}</td>
+        <td>${de.length>0?`<span style="font-size:11px;color:var(--primary)">${de.length}</span>`:dash}</td>
+      </tr>`;
+    });
+    const wNetP=rP+rTI-rTO,wC=wNetP+rO-rC-rSc,wG=rS-wC,wM=rS>0?(wG/rS)*100:0;
+    html+=`<tr class="wtr"><td colspan="2">📊 Week ${w+1} Total</td><td>${fmt(rS)}</td><td>${fmt(rP)}</td>
+      <td style="color:#80deea">${fmt(rTI)}</td><td style="color:#f48fb1">${fmt(rTO)}</td>
+      <td>${fmt(wNetP)}</td><td>${fmt(rO)}</td><td>${fmt(rC)}</td><td>${fmt(rSc)}</td>
+      <td>${fmt(wC)}</td><td>${fmt(wG)}</td><td>${rS>0?fmtP(wM):'—'}</td><td></td>
+    </tr></tbody></table></div></div>`;
+  }
+  c.innerHTML=html;
+}
+
+function saveInv(deptId,p){
+  const activeDeptId = (isDualDept() && !session.isAdmin) ? getActiveDeptId() : deptId;
+  deptId = activeDeptId; // save to correct tracker
+  const o=parseFloat(document.getElementById('inv_open_'+p)?.value)||0;
+  const cl=parseFloat(document.getElementById('inv_close_'+p)?.value)||0;
+  if(!deptData[deptId])deptData[deptId]={entries:{},inventory:{},budget:{},settings:{}};
+  if(!deptData[deptId].inventory)deptData[deptId].inventory={};
+  deptData[deptId].inventory['p'+p]={open:o,close:cl};
+  saveDeptField(deptId,'inventory',deptData[deptId].inventory);
+  setTimeout(()=>renderPeriod(deptId,p),80);
+  toast('Inventory saved','success');
+}
+
+// ══════════════════════════════════════════════════════════
+// YTD PAGE
+// ══════════════════════════════════════════════════════════
+function renderYTD(deptId){
+  const c=document.getElementById('pg_ytd');if(!c)return;
+  // Dual tracker: use active sub-dept
+  const activeDeptId = (isDualDept() && !session.isAdmin) ? getActiveDeptId() : deptId;
+  const cal=getCal(deptId),bud=getBudget(activeDeptId);
+  const budSalesY=parseFloat(bud.salesYear)||0,budM=parseFloat(bud.marginPct)||0;
+  // Use activeDeptId for all data lookups
+  const budGPY=budSalesY*(budM/100),hasBudget=(budSalesY>0||budM>0);
+  const s=getSettings(deptId),target=s.targetMargin||30;
+  let ytdSales=0,ytdCost=0,ytdGP=0,ytdPurch=0,ytdOut=0,ytdCred=0,ytdScan=0,ytdTIn=0,ytdTOut=0,ytdNetP=0;
+  cal.forEach((period,p)=>{const inv=getInv(activeDeptId,p),pe=entriesRange(activeDeptId,period.start,period.end),ps=calcM(pe,inv.open,inv.close);ytdSales+=ps.sales;ytdCost+=ps.cost;ytdGP+=ps.gp;ytdPurch+=ps.purchases;ytdOut+=ps.outside;ytdCred+=ps.credits;ytdScan+=ps.scanbacks;ytdTIn+=ps.transferIn;ytdTOut+=ps.transferOut;ytdNetP+=ps.netPurchases;});
+  const ytdMargin=ytdSales>0?(ytdGP/ytdSales)*100:0,ymc=mColor(ytdMargin,target),mp=Math.min(100,Math.max(0,(ytdMargin/target)*100));
+
+  let html=`<div class="ph"><div><h1>Year to Date</h1><div class="sub">${cal[0]?fmtD(cal[0].start):''} — ${cal[PERIODS-1]?fmtD(cal[PERIODS-1].end):''}</div></div>
+    <button class="btn sm" onclick="exportYTD('${deptId}')">⬇ CSV</button>
+  </div>`;
+
+  if(hasBudget){
+    const sDiff=ytdSales-budSalesY,gDiff=ytdGP-budGPY,mDiff=ytdMargin-budM;
+    html+=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin-bottom:16px">
+      <div class="btile"><div class="blbl">YTD Sales vs Budget</div><div class="brow"><span class="bact">${fmt(ytdSales)}</span><span class="bbud">Bud: ${fmt(budSalesY)}</span></div>
+        <span class="bdiff ${sDiff>=0?'up':'down'}">${sDiff>=0?'+':''}${fmt(sDiff)} (${sDiff>=0?'+':''}${budSalesY>0?((sDiff/budSalesY)*100).toFixed(1):'0.0'}%)</span></div>
+      <div class="btile"><div class="blbl">YTD Margin % vs Budget</div><div class="brow"><span class="bact" style="color:var(--${ymc==='green'?'success':'danger'})">${fmtP(ytdMargin)}</span><span class="bbud">Bud: ${fmtP(budM)}</span></div>
+        <span class="bdiff ${mDiff>=0?'up':'down'}">${mDiff>=0?'+':''}${mDiff.toFixed(2)}%</span></div>
+      <div class="btile"><div class="blbl">YTD GP vs Budget</div><div class="brow"><span class="bact">${fmt(ytdGP)}</span><span class="bbud">Bud: ${fmt(budGPY)}</span></div>
+        <span class="bdiff ${gDiff>=0?'up':'down'}">${gDiff>=0?'+':''}${fmt(gDiff)}</span></div>
+    </div>`;
+  }
+
+  html+=`<div class="ytdg">
+    <div class="yc"><div class="yl">Total Sales</div><div class="yv" style="color:var(--primary)">${fmt(ytdSales)}</div></div>
+    <div class="yc"><div class="yl">Total COGS</div><div class="yv" style="color:var(--warning)">${fmt(ytdCost)}</div></div>
+    <div class="yc"><div class="yl">Gross Profit</div><div class="yv" style="color:var(--${ytdGP>=0?'success':'danger'})">${fmt(ytdGP)}</div></div>
+    <div class="yc"><div class="yl">Overall Margin %</div><div class="yv" style="color:var(--${ymc==='green'?'success':'danger'})">${fmtP(ytdMargin)}</div>
+      <div style="font-size:10px;color:var(--text2);margin-bottom:3px">Target: ${target}%</div>
+      <div class="pb"><div class="pbi" style="width:${mp}%;background:var(--${ymc==='green'?'success':'danger'})"></div></div></div>
+    <div class="yc"><div class="yl">Transfer In</div><div class="yv" style="color:#006064">${fmt(ytdTIn)}</div></div>
+    <div class="yc"><div class="yl">Transfer Out</div><div class="yv" style="color:#880e4f">${fmt(ytdTOut)}</div></div>
+    <div class="yc"><div class="yl">Net Purchases</div><div class="yv" style="color:var(--warning)">${fmt(ytdNetP)}</div></div>
+  </div>`;
+
+  const budP=budSalesY/PERIODS;
+  html+=`<div class="card"><h2>Period-by-Period Breakdown</h2><div class="tw"><table>
+    <thead><tr><th>Period</th><th>Dates</th><th>Sales</th>${hasBudget?'<th>Bud Sales</th><th>Sales Diff</th>':''}<th>Net Purch</th><th>Trsf In</th><th>Trsf Out</th><th>Open Inv</th><th>Close Inv</th><th>COGS</th><th>GP</th><th>Margin %</th>${hasBudget?'<th>Bud Mar</th><th>Mar Diff</th>':''}</tr></thead><tbody>`;
+  let tS=0,tC=0,tG=0;
+  cal.forEach((period,p)=>{
+    const inv=getInv(activeDeptId,p),pe=entriesRange(activeDeptId,period.start,period.end),ps=calcM(pe,inv.open,inv.close);
+    tS+=ps.sales;tC+=ps.cost;tG+=ps.gp;
+    const cc=chipClass(ps.margin,target),sDiff=ps.sales-budP,mDiff=ps.margin-budM;
+    html+=`<tr style="cursor:pointer" onclick="showPage('p${p}')">
+      <td><strong>P${p+1}</strong></td><td style="font-size:11px;color:var(--text2)">${fmtS(period.start)}–${fmtS(period.end)}</td>
+      <td>${fmt(ps.sales)}</td>
+      ${hasBudget?`<td style="color:var(--text2)">${fmt(budP)}</td><td><span class="bdiff ${sDiff>=0?'up':'down'}" style="font-size:11px">${sDiff>=0?'+':''}${fmt(sDiff)}</span></td>`:''}
+      <td>${fmt(ps.netPurchases)}</td>
+      <td style="color:#006064">${ps.transferIn>0?fmt(ps.transferIn):'—'}</td>
+      <td style="color:#880e4f">${ps.transferOut>0?fmt(ps.transferOut):'—'}</td>
+      <td>${inv.open>0?fmt(inv.open):'—'}</td><td>${inv.close>0?fmt(inv.close):'—'}</td>
+      <td>${fmt(ps.cost)}</td><td>${fmt(ps.gp)}</td>
+      <td>${ps.sales>0?`<span class="chip ${cc}">${fmtP(ps.margin)}</span>`:'—'}</td>
+      ${hasBudget?`<td style="color:var(--text2)">${fmtP(budM)}</td><td><span class="bdiff ${mDiff>=0?'up':'down'}" style="font-size:11px">${mDiff>=0?'+':''}${mDiff.toFixed(2)}%</span></td>`:''}
+    </tr>`;
+  });
+  const ovm=tS>0?(tG/tS)*100:0;
+  html+=`<tr style="font-weight:700;background:#f8f9fa;border-top:2px solid var(--border)">
+    <td colspan="2">YTD Total</td><td>${fmt(tS)}</td>
+    ${hasBudget?`<td>${fmt(budSalesY)}</td><td><span class="bdiff ${tS>=budSalesY?'up':'down'}" style="font-size:11px">${tS>=budSalesY?'+':''}${fmt(tS-budSalesY)}</span></td>`:''}
+    <td colspan="6"></td><td>${fmt(tC)}</td><td>${fmt(tG)}</td>
+    <td><span class="chip ${chipClass(ovm,target)}">${fmtP(ovm)}</span></td>
+    ${hasBudget?`<td>${fmtP(budM)}</td><td><span class="bdiff ${ovm>=budM?'up':'down'}" style="font-size:11px">${ovm>=budM?'+':''}${(ovm-budM).toFixed(2)}%</span></td>`:''}
+  </tr></tbody></table></div>
+  <p style="font-size:11px;color:#9aa0a6;margin-top:7px">Click any period to view detail.</p></div>`;
+  c.innerHTML=html;
+}
+
+// ══════════════════════════════════════════════════════════
+// SETTINGS PAGE
+// ══════════════════════════════════════════════════════════
+function settingsHTML(deptId){
+  return `<div class="ph"><div><h1>Settings</h1><div class="sub">Fiscal calendar and preferences</div></div></div>
+  <div class="card">
+    <div class="sset"><h3>Business</h3>
+      <div class="fgrid" style="max-width:500px">
+        <div class="fg"><label>Target Margin % (colour coding)</label><input type="number" id="sTgt" step="0.1" min="0" max="100" placeholder="30"></div>
+      </div>
+    </div>
+    <div class="sset"><h3>Fiscal Calendar</h3>
+      <p style="font-size:12px;color:var(--text2);margin-bottom:8px">Starts on the Sunday on or before February 1.</p>
+      <div class="fgrid" style="max-width:280px">
+        <div class="fg"><label>Fiscal Year (Feb 1 of which year)</label>
+          <select id="sFY">${Array.from({length:10},(_,i)=>{const y=new Date().getFullYear()-2+i;return`<option value="${y}">${y}–${y+1}</option>`;}).join('')}</select>
+        </div>
+      </div>
+      <p style="font-size:12px;color:#9aa0a6;margin-top:5px" id="fyPreview"></p>
+    </div>
+    <div class="sset"><h3>Data Export</h3>
+      <div class="bg">
+        <button class="btn" onclick="exportAllEntries('${deptId}')">⬇ Export All Entries (CSV)</button>
+      </div>
+    </div>
+    <button class="btn primary" onclick="saveSettings('${deptId}')">Save Settings</button>
+  </div>`;
+}
+function renderSettings(deptId){
+  const s=getSettings(deptId);
+  const t=document.getElementById('sTgt'),fy=document.getElementById('sFY');
+  if(t)t.value=s.targetMargin||30;
+  if(fy){fy.value=s.fiscalYear||new Date().getFullYear();fy.onchange=()=>updateFYPreview(deptId);}
+  updateFYPreview(deptId);
+}
+function updateFYPreview(deptId){
+  const el=document.getElementById('fyPreview'),fy=document.getElementById('sFY');if(!el||!fy)return;
+  const yr=parseInt(fy.value),feb1=new Date(yr,1,1),dow=feb1.getDay(),s2=new Date(feb1);
+  if(dow!==0)s2.setDate(feb1.getDate()-dow);
+  const end=new Date(s2);end.setDate(s2.getDate()+364);
+  el.textContent=fmtD(s2)+' → '+fmtD(end);
+}
+function saveSettings(deptId){
+  const target=parseFloat(document.getElementById('sTgt')?.value)||30;
+  const fy=parseInt(document.getElementById('sFY')?.value)||new Date().getFullYear();
+  if(!deptData[deptId])deptData[deptId]={entries:{},inventory:{},budget:{},settings:{}};
+  deptData[deptId].settings={targetMargin:target,fiscalYear:fy};
+  saveDeptField(deptId,'settings',{targetMargin:target,fiscalYear:fy});
+  toast('Settings saved','success');
+}
+
+// ══════════════════════════════════════════════════════════
+// EXPORTS
+// ══════════════════════════════════════════════════════════
+function dlCSV(rows,name){const csv=rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\n');const b=new Blob([csv],{type:'text/csv'}),u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download=name;a.click();URL.revokeObjectURL(u);}
+function exportAllEntries(deptId){const rows=[['Date','Type','Amount','Description']];getEntries(deptId).sort((a,b)=>a.date>b.date?-1:1).forEach(e=>rows.push([e.date,e.type,e.amount,e.desc||'']));dlCSV(rows,'entries_'+deptId+'.csv');toast('Exported');}
+function exportPeriod(deptId,p){const cal=getCal(deptId),period=cal[p],inv=getInv(deptId,p),pe=entriesRange(deptId,period.start,period.end),ps=calcM(pe,inv.open,inv.close);const rows=[['Period','P'+(p+1)],['Start',dk(period.start)],['End',dk(period.end)],['Opening Inv',inv.open],['Closing Inv',inv.close],['Sales',ps.sales.toFixed(2)],['Net Purchases',ps.netPurchases.toFixed(2)],['Transfer In',ps.transferIn.toFixed(2)],['Transfer Out',ps.transferOut.toFixed(2)],['Outside',ps.outside.toFixed(2)],['Credits',ps.credits.toFixed(2)],['Scanbacks',ps.scanbacks.toFixed(2)],['COGS',ps.cost.toFixed(2)],['GP',ps.gp.toFixed(2)],['Margin %',ps.margin.toFixed(2)],[],[' Date','Type','Amount','Description']];pe.forEach(e=>rows.push([e.date,e.type,e.amount,e.desc||'']));dlCSV(rows,'period_'+(p+1)+'_'+deptId+'.csv');toast('Period '+(p+1)+' exported');}
+function exportYTD(deptId){const activeDeptId=(isDualDept()&&!session.isAdmin)?getActiveDeptId():deptId;const cal=getCal(deptId),bud=getBudget(activeDeptId),budP=(parseFloat(bud.salesYear)||0)/PERIODS,budM=parseFloat(bud.marginPct)||0;const rows=[['Period','Start','End','Open Inv','Close Inv','Sales','Bud Sales','Sales Diff','Net Purch','Trsf In','Trsf Out','Outside','Credits','Scanbacks','COGS','GP','Margin %','Bud Margin','Margin Diff']];cal.forEach((period,p)=>{const inv=getInv(activeDeptId,p),pe=entriesRange(activeDeptId,period.start,period.end),ps=calcM(pe,inv.open,inv.close);rows.push(['P'+(p+1),dk(period.start),dk(period.end),inv.open,inv.close,ps.sales.toFixed(2),budP.toFixed(2),(ps.sales-budP).toFixed(2),ps.netPurchases.toFixed(2),ps.transferIn.toFixed(2),ps.transferOut.toFixed(2),ps.outside.toFixed(2),ps.credits.toFixed(2),ps.scanbacks.toFixed(2),ps.cost.toFixed(2),ps.gp.toFixed(2),ps.margin.toFixed(2),budM.toFixed(2),(ps.margin-budM).toFixed(2)]);});dlCSV(rows,'ytd_'+deptId+'.csv');toast('YTD exported');}
+
+
+// ── SUPERUSER PIN MANAGEMENT ───────────────────────────────
+function openSuperuserPinModal(){
+  document.getElementById('suPinInput').value = '';
+  document.getElementById('suPinModal').classList.add('open');
+}
+function saveSuperuserPin(){
+  const pin = document.getElementById('suPinInput').value.trim();
+  if(pin.length !== 6 || isNaN(pin)){ toast('PIN must be exactly 6 digits','error'); return; }
+  if(pin === ADMIN_PIN){ toast('Cannot use admin PIN','error'); return; }
+  const dup = Object.entries(allDepts).find(([id,d])=>d.pin===pin);
+  if(dup){ toast('PIN used by: '+dup[1].name,'error'); return; }
+  _superuserPin = pin;
+  fbRef('config/superuserPin').set(pin);
+  toast('Superuser PIN updated','success');
+  closeModal();
+}
+
+// ══════════════════════════════════════════════════════════
+// INIT — LOAD DEPTS THEN SHOW LOGIN
+// ══════════════════════════════════════════════════════════
+function init(){
+  if(FIREBASE_CONFIG.apiKey === "REPLACE_WITH_YOUR_API_KEY"){
+    document.getElementById('loadingOverlay').innerHTML=`<div style="background:#fff;border-radius:12px;padding:28px;max-width:480px;text-align:center">
+      <div style="font-size:28px;margin-bottom:10px">⚙️</div>
+      <h2 style="font-size:16px;color:#202124;margin-bottom:10px">Firebase Not Configured</h2>
+      <p style="font-size:13px;color:#5f6368;line-height:1.7">Please open this file in a text editor and replace the Firebase config values at the top of the script with your own Firebase project credentials.<br><br>See the setup guide below for instructions.</p>
+      <div style="background:#f8f9fa;border-radius:8px;padding:14px;text-align:left;margin-top:14px;font-size:12px;color:#202124;line-height:2">
+        <strong>Quick Setup:</strong><br>
+        1. Go to <a href="https://console.firebase.google.com" target="_blank" style="color:#1a73e8">console.firebase.google.com</a><br>
+        2. Select your project → ⚙️ Project Settings<br>
+        3. Under "Your apps" click the Web app (&lt;/&gt;)<br>
+        4. Copy the firebaseConfig object values<br>
+        5. Paste them into FIREBASE_CONFIG at top of this file<br>
+        6. In Firebase: Realtime Database → Rules → set read/write to true (for testing)<br>
+        7. Change ADMIN_PIN at top of script to your desired PIN
+      </div>
+    </div>`;
+    return;
+  }
+  const connTimeout = setTimeout(()=>{
+    document.getElementById('loadingOverlay').innerHTML='<div style="background:#fff;border-radius:12px;padding:28px;max-width:420px;text-align:center"><div style="font-size:28px;margin-bottom:10px">⚠️</div><h2 style="font-size:16px;margin-bottom:10px">Cannot Connect to Database</h2><p style="font-size:13px;color:#5f6368;margin-bottom:14px">Check your Firebase Rules are set to read/write true.</p><button onclick="location.reload()" style="padding:10px 20px;background:#1a73e8;color:#fff;border:none;border-radius:8px;font-size:13px;cursor:pointer">Retry</button></div>';
+  }, 8000);
+
+  // Load superuser PIN from Firebase
+  if(db){ fbRef('config/superuserPin').on('value', snap=>{ if(snap.val()) _superuserPin=snap.val(); }); }
+
+  loadDepts(()=>{
+    clearTimeout(connTimeout);
+    document.getElementById('loadingOverlay').style.display='none';
+    document.getElementById('loginScreen').style.display='flex';
+  });
+}
+
+// Listen for live dept changes (so admin sees new depts without refresh)
+function watchDepts(){
+  var ref = fbRef('departments');
+  if(ref) ref.on('value', function(snap){ allDepts=snap.val()||{}; });
+}
+
+// ── KEYBOARD PIN INPUT ─────────────────────────────────────
+document.addEventListener('keydown', function(e){
+  var ls = document.getElementById('loginScreen');
+  if(!ls || ls.style.display === 'none') return;
+  if(e.key >= '0' && e.key <= '9'){ e.preventDefault(); pinPress(e.key); }
+  else if(e.key === 'Backspace'){ e.preventDefault(); pinDel(); }
+  else if(e.key === 'Escape'){ e.preventDefault(); pinClear(); }
+  else if(e.key === 'Enter' && pinBuffer.length === 6){ e.preventDefault(); checkPin(); }
+});
+
+// ── BACKUP & RESTORE ───────────────────────────────────────
+var BACKUP_24H = 24*60*60*1000;
+function getLastBackupTs(){ return parseInt(localStorage.getItem('mt_last_backup')||'0'); }
+function setLastBackupTs(){ localStorage.setItem('mt_last_backup',Date.now().toString()); }
+function backupStatus(){ var l=getLastBackupTs();if(!l)return 'never';return(Date.now()-l>BACKUP_24H)?'overdue':'ok'; }
+function fmtBackupTime(ts){ if(!ts)return 'Never';var d=new Date(ts);return d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})+' '+d.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}); }
+function timeSinceBackup(ts){ if(!ts)return 'Never backed up';var diff=Date.now()-ts,h=Math.floor(diff/3600000),m=Math.floor((diff%3600000)/60000);if(h>=24)return Math.floor(h/24)+'d '+(h%24)+'h ago';if(h>0)return h+'h '+m+'m ago';return m+'m ago'; }
+function updateBackupNavBadge(){
+  var btn=document.getElementById('nav_admin_backup');if(!btn)return;
+  var s=backupStatus();
+  btn.innerHTML='&#128190; Backup &amp; Restore '+(s==='never'?'<span class="backup-badge never">!</span>':s==='overdue'?'<span class="backup-badge overdue">!</span>':'<span class="backup-badge ok">&#10003;</span>');
+}
+function adminBackupHTML(){
+  return '<div class="ph"><div><h1>&#128190; Backup &amp; Restore</h1><div class="sub">Download a full backup or restore from a previous backup</div></div></div><div id="backupPageContent"></div>';
+}
+function renderAdminBackup(){
+  var c=document.getElementById('backupPageContent');if(!c)return;
+  var last=getLastBackupTs(),status=backupStatus(),depts=Object.entries(allDepts);
+  var totalEntries=Object.values(deptData).reduce(function(s,d){return s+Object.keys(d.entries||{}).length;},0);
+  var html='';
+  if(status==='never') html+='<div style="background:#fff3e0;border:1px solid #ffe082;border-radius:10px;padding:14px 18px;margin-bottom:16px;display:flex;align-items:center;gap:12px"><span style="font-size:24px">&#9888;</span><div><div style="font-weight:700;color:#e65100">No backup found</div><div style="font-size:12px;color:#e65100">Download your first backup now to protect your data.</div></div></div>';
+  else if(status==='overdue') html+='<div style="background:#fce8e6;border:1px solid #f5c6c2;border-radius:10px;padding:14px 18px;margin-bottom:16px;display:flex;align-items:center;gap:12px"><span style="font-size:24px">&#128680;</span><div><div style="font-weight:700;color:#d93025">Backup Overdue</div><div style="font-size:12px;color:#d93025">Last: '+fmtBackupTime(last)+' ('+timeSinceBackup(last)+')</div></div></div>';
+  else html+='<div style="background:#e6f4ea;border:1px solid #b7dfbf;border-radius:10px;padding:14px 18px;margin-bottom:16px;display:flex;align-items:center;gap:12px"><span style="font-size:24px">&#9989;</span><div><div style="font-weight:700;color:#0f9d58">Backup Up to Date</div><div style="font-size:12px;color:#0f9d58">Last: '+fmtBackupTime(last)+' ('+timeSinceBackup(last)+')</div></div></div>';
+  html+='<div class="bk-section"><h3>&#128202; Current Data</h3>';
+  html+='<div class="bk-stat"><div class="bsl">Departments</div><div class="bsv">'+depts.length+'</div></div>';
+  html+='<div class="bk-stat"><div class="bsl">Total Entries</div><div class="bsv">'+totalEntries+'</div></div>';
+  html+='<div class="bk-stat"><div class="bsl">Last Backup</div><div class="bsv">'+fmtBackupTime(last)+'</div></div>';
+  html+='<div class="bk-stat"><div class="bsl">Backup Age</div><div class="bsv">'+timeSinceBackup(last)+'</div></div></div>';
+  html+='<div class="bk-section"><h3>&#8681; Download Backup</h3>';
+  html+='<p style="font-size:12px;color:var(--text2);margin-bottom:12px">Downloads ALL departments, entries, inventory, budgets and settings as one JSON file. Store it in Google Drive or email it to yourself.</p>';
+  html+='<div class="bg"><button class="btn primary" onclick="performFullBackup()">&#8681; Download Full Backup (.json)</button></div></div>';
+  if(depts.length>0){
+    html+='<div class="bk-section"><h3>&#8681; Single Department</h3><div style="display:flex;flex-wrap:wrap;gap:8px">';
+    depts.forEach(function(arr){ var id=arr[0],d=arr[1],cnt=Object.keys((deptData[id]||{}).entries||{}).length; html+='<button class="btn sm" onclick="performDeptBackup(\''+id+'\')">⬇ '+d.name+' <span style="color:var(--text2);font-size:10px">('+cnt+')</span></button>'; });
+    html+='</div></div>';
+  }
+  html+='<div class="bk-section"><h3>&#8679; Restore from Backup</h3>';
+  html+='<p style="font-size:12px;color:var(--warning);margin-bottom:10px">&#9888; Restoring will <strong>overwrite</strong> all existing data. Download a current backup first.</p>';
+  html+='<div class="restore-drop" id="restoreDrop" onclick="document.getElementById(\'restoreFile\').click()" ondragover="event.preventDefault();this.classList.add(\'dragover\')" ondragleave="this.classList.remove(\'dragover\')" ondrop="handleRestoreDrop(event)">&#128193; Click or drag &amp; drop backup file here<br><span style="font-size:11px;color:#9aa0a6">Accepts .json files created by this app</span></div>';
+  html+='<input type="file" id="restoreFile" accept=".json" style="display:none" onchange="handleRestoreFile(event)"><div id="restorePreview"></div></div>';
+  c.innerHTML=html; updateBackupNavBadge();
+}
+function performFullBackup(){
+  var b={version:2,createdAt:new Date().toISOString(),type:'full',departments:allDepts,data:deptData,config:{superuserPin:_superuserPin}};
+  var blob=new Blob([JSON.stringify(b,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');
+  a.href=url;a.download='MarginTracker_Backup_'+new Date().toISOString().slice(0,10)+'.json';a.click();URL.revokeObjectURL(url);
+  setLastBackupTs();toast('Full backup downloaded!','success');renderAdminBackup();updateBackupNavBadge();
+}
+function performDeptBackup(deptId){
+  var dept=allDepts[deptId]||{},data=deptData[deptId]||{};
+  var b={version:2,createdAt:new Date().toISOString(),type:'department',deptId:deptId,department:dept,data:data};
+  var blob=new Blob([JSON.stringify(b,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');
+  a.href=url;a.download='MarginTracker_'+(dept.name||deptId).replace(/\s+/g,'_')+'_'+new Date().toISOString().slice(0,10)+'.json';a.click();URL.revokeObjectURL(url);
+  toast((dept.name||deptId)+' backup downloaded!','success');
+}
+var pendingRestoreData=null;
+function handleRestoreDrop(e){ e.preventDefault();var el=document.getElementById('restoreDrop');if(el)el.classList.remove('dragover');if(e.dataTransfer.files[0])processRestoreFile(e.dataTransfer.files[0]); }
+function handleRestoreFile(e){ if(e.target.files[0])processRestoreFile(e.target.files[0]);e.target.value=''; }
+function processRestoreFile(file){
+  if(!file.name.endsWith('.json')){toast('Please select a .json backup file','error');return;}
+  var reader=new FileReader();
+  reader.onload=function(ev){ try{ var data=JSON.parse(ev.target.result);if(!data.version||!data.type){toast('Invalid backup file','error');return;}pendingRestoreData=data;showRestorePreview(data,file.name);}catch(err){toast('Could not read file','error');} };
+  reader.readAsText(file);
+}
+function showRestorePreview(data,filename){
+  var c=document.getElementById('restorePreview');if(!c)return;
+  var isFull=data.type==='full';
+  var cnt=isFull?Object.values(data.data||{}).reduce(function(s,d){return s+Object.keys(d.entries||{}).length;},0):Object.keys((data.data||{}).entries||{}).length;
+  var dn=isFull?'ALL departments':((data.department||{}).name||data.deptId);
+  var fi=document.getElementById('restoreFileInfo');
+  if(fi)fi.innerHTML='<strong>'+filename+'</strong><br>Type: '+(isFull?'Full Backup':'Dept Backup')+'<br>Created: '+(data.createdAt?new Date(data.createdAt).toLocaleString():'Unknown')+'<br>Covers: '+dn+'<br>Entries: '+cnt;
+  c.innerHTML='<div style="background:#e8f0fe;border-radius:8px;padding:12px;border-left:3px solid var(--primary)"><div style="font-weight:600;font-size:13px;margin-bottom:8px">&#128196; File ready</div><div class="bg"><button class="btn danger" onclick="confirmRestore()">&#9888; Restore</button><button class="btn" style="margin-left:8px" onclick="cancelRestore()">Cancel</button></div></div>';
+}
+function cancelRestore(){ pendingRestoreData=null;var c=document.getElementById('restorePreview');if(c)c.innerHTML=''; }
+function confirmRestore(){ if(!pendingRestoreData){toast('No backup selected','error');return;}document.getElementById('restoreConfirmModal').classList.add('open'); }
+document.getElementById('confirmRestoreBtn').onclick=function(){ closeModal();if(pendingRestoreData)executeRestore(pendingRestoreData); };
+function executeRestore(data){
+  if(data.type==='full'){
+    var r1=fbRef('departments');if(r1)r1.set(data.departments||{});
+    var r2=fbRef('data');if(r2)r2.set(data.data||{});
+    if(data.config&&data.config.superuserPin){var r3=fbRef('config/superuserPin');if(r3)r3.set(data.config.superuserPin);}
+    toast('Restore complete! Reloading...','success');setTimeout(function(){location.reload();},2000);
+  }else if(data.type==='department'){
+    var id=data.deptId;if(!id){toast('Invalid backup','error');return;}
+    var rd=fbRef('departments/'+id);if(rd)rd.set(data.department||{});
+    var rdd=fbRef('data/'+id);if(rdd)rdd.set(data.data||{});
+    toast('Restore complete! Reloading...','success');setTimeout(function(){location.reload();},2000);
+  }
+  pendingRestoreData=null;
+}
+
+watchDepts();
+init();
+</script>
+</body>
+</html>
