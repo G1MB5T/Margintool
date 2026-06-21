@@ -1645,7 +1645,7 @@ function renderPeriod(deptId,p){
     <div class="mtile"><div class="lbl">Scanbacks</div><div class="val green">${fmt(ps.scanbacks)}</div></div>
     ${ps.hasInv?`<div class="mtile"><div class="lbl">Opening Inv (+)</div><div class="val orange">${fmt(ps.openInv)}</div></div>
     <div class="mtile"><div class="lbl">Closing Inv (−)</div><div class="val green">${fmt(ps.closeInv)}</div></div>`:''}
-    <div class="mtile"><div class="lbl">${ps.hasInv?'True COGS':'Cost'}</div><div class="val orange">${fmt(ps.cost)}</div></div>
+    <div class="mtile" title="${ps.hasInv?`True COGS = Opening Inv + Net Purchases + Outside − Credits − Scanbacks − Closing Inv\n= ${fmt(ps.openInv)} + ${fmt(ps.netPurchases)} + ${fmt(ps.outside)} − ${fmt(ps.credits)} − ${fmt(ps.scanbacks)} − ${fmt(ps.closeInv)}\n= ${fmt(ps.cost)}\n\nInventory Δ (Opening − Closing) = ${fmt(ps.openInv-ps.closeInv)} — this is why COGS differs from Net Purchases.`:`Cost = Net Purchases + Outside − Credits − Scanbacks\n= ${fmt(ps.netPurchases)} + ${fmt(ps.outside)} − ${fmt(ps.credits)} − ${fmt(ps.scanbacks)}\n= ${fmt(ps.cost)}\n\nEnter Opening & Closing Inventory (Week 1 / Week 4 headers) to switch to True COGS.`}"><div class="lbl">${ps.hasInv?'True COGS ⓘ':'Cost ⓘ'}</div><div class="val orange">${fmt(ps.cost)}</div>${ps.hasInv?`<div class="sub">incl. inv Δ ${(ps.openInv-ps.closeInv)>=0?'+':''}${fmt(ps.openInv-ps.closeInv)}</div>`:''}</div>
     <div class="mtile"><div class="lbl">Gross Profit</div><div class="val ${ps.gp>=0?'green':'red'}">${fmt(ps.gp)}</div></div>
     <div class="mtile"><div class="lbl">Margin %</div><div class="val ${mColor(ps.margin,t)}">${fmtP(ps.margin)}</div><div class="sub">Target: ${t}%</div></div>
   </div>`;
