@@ -822,8 +822,32 @@ function getBudget(deptId){
   }
   return b;
 }
-function budgetSalesP(deptId){ return (parseFloat(getBudget(deptId).salesYear)||0)/PERIODS; }
-function budgetSalesW(deptId){ return (parseFloat(getBudget(deptId).salesYear)||0)/(PERIODS*WPP); }
+// Actual weekly sales budgets (FY2026) from the Sales Command dashboard — index 0..51 = fiscal week 1..52.
+// Period budget = sum of its 4 weeks; week budget = that specific week. Falls back to an even annual
+// spread when a dept has no weekly data or its fiscal year isn't the one these figures are for.
+const WEEK_BUDGET_FY = 2026;
+const WEEK_BUDGETS = {
+  'dept_1778307770530':[331300,347900,278700,283100,292600,296800,281000,281000,358100,258200,290300,269900,287200,297200,317700,290100,305600,298900,278000,293200,335200,288000,290700,296400,265700,321500,290200,273400,286900,330900,248950,272200,290025,270000,274050,342050,243450,262350,288600,284800,279000,276400,296100,305900,343200,316000,395400,222950,290950,283750,275200,274750], // Grocery
+  'dept_1778307580813':[110500,101800,100100,108000,115900,102800,113400,103200,127500,104800,113500,110200,122500,124400,140200,118700,134600,123000,116100,124500,150500,113500,114900,121400,105500,134700,113500,105800,114350,137350,97850,106600,126100,116800,108000,130900,87600,88900,112700,99400,101700,99600,119600,115750,123850,112300,131700,86050,101000,98900,97850,108300], // Meat
+  'dept_1778307477984':[78100,85700,72800,76300,77100,78200,76800,75200,97800,74900,82600,78200,86100,96600,94500,82300,95600,83300,81100,86400,95400,84400,84900,85600,78400,88900,71600,71300,73300,79900,68550,66450,71050,71350,65550,82750,59000,60500,66650,57650,61750,62150,63700,68300,64100,64900,84600,52750,66550,66850,66050,67050], // Produce
+  'dept_1778261948525':[33900,34100,33400,35400,34900,34100,34600,31100,37900,32300,33200,34900,36600,40700,39100,35800,40900,38500,38400,38600,43500,39600,41500,42300,39900,46100,41800,38700,40200,48800,39400,40800,40900,41600,41100,41600,34400,38400,38800,37700,34850,38500,44050,36600,37300,37300,43050,24850,30500,30800,28600,32450], // Deli (excl Sushi/Bento)
+  'dept_1778307692274':[22700,29100,23900,25500,25100,22800,24800,24200,34900,25000,24200,27600,25100,31100,30300,26400,28000,27000,31000,30700,34300,28600,30500,30300,28000,32200,28200,27000,28500,34550,25300,27700,31700,26250,31800,35550,27300,27600,27400,27300,26800,27200,26900,29800,26450,26900,37700,23150,24150,24950,24950,25350], // Bakery Instore
+  'dept_1778307692274_commercial':[6500,5600,6400,6000,6400,6300,6400,5700,6400,6300,6200,6400,6500,6900,6800,6500,6900,6700,6900,6700,8300,6600,6900,7200,6100,7500,6600,6100,6500,7200,6600,6000,6500,6800,6600,6600,4950,5050,5050,5050,4650,4950,4850,4950,4950,4850,6150,5050,5250,5350,4750,5050] // Bakery Commercial
+};
+function weeklyBudgetArr(deptId){
+  if((getSettings(deptId).fiscalYear||0)!==WEEK_BUDGET_FY) return null;
+  return WEEK_BUDGETS[deptId]||null;
+}
+function budgetSalesW(deptId,gwi){
+  const arr=weeklyBudgetArr(deptId);
+  if(arr && typeof gwi==='number' && gwi>=0 && gwi<arr.length) return arr[gwi];
+  return (parseFloat(getBudget(deptId).salesYear)||0)/(PERIODS*WPP);
+}
+function budgetSalesP(deptId,p){
+  const arr=weeklyBudgetArr(deptId);
+  if(arr && typeof p==='number' && p>=0){ let s=0; for(let w=0;w<WPP;w++) s+=arr[p*WPP+w]||0; return s; }
+  return (parseFloat(getBudget(deptId).salesYear)||0)/PERIODS;
+}
 
 function entriesFor(deptId,ds){ return getEntries(deptId).filter(e=>e.date===ds); }
 function entriesRange(deptId,s,e){ const sk=dk(s),ek=dk(e); return getEntries(deptId).filter(x=>x.date>=sk&&x.date<=ek); }
@@ -1624,7 +1648,7 @@ function renderPeriod(deptId,p){
   // activeDeptId must be defined FIRST
   const activeDeptId=isDualDept()?getActiveDeptId():deptId;
   const inv=getInv(activeDeptId,p),pe=entriesRange(activeDeptId,period.start,period.end),ps=calcM(pe,inv.open,inv.close);
-  const bud=getBudget(activeDeptId),budSales=budgetSalesP(activeDeptId),budM=parseFloat(bud.marginPct)||0;
+  const bud=getBudget(activeDeptId),budSales=budgetSalesP(activeDeptId,p),budM=parseFloat(bud.marginPct)||0;
   const budGP=budSales*(budM/100),hasBudget=(budSales>0||budM>0);
   const s=getSettings(activeDeptId),t=s.targetMargin||30;
   const pmClass=mColor(ps.margin,t)==='green'?'good':(mColor(ps.margin,t)==='orange'?'warn':'bad');
@@ -1673,7 +1697,7 @@ function renderPeriod(deptId,p){
 
   for(let w=0;w<WPP;w++){
     const week=period.weeks[w],we=entriesRange(activeDeptId,week.start,week.end),ws=calcM(we);
-    const budW=budgetSalesW(activeDeptId),wBudGP=budW*(budM/100),wmc=mColor(ws.margin,t);
+    const budW=budgetSalesW(activeDeptId,p*WPP+w),wBudGP=budW*(budM/100),wmc=mColor(ws.margin,t);
 
     // Opening inventory inline in Week 1, Closing in Week 4
     const isFirstWeek=(w===0), isLastWeek=(w===WPP-1);
@@ -1804,14 +1828,13 @@ function renderYTD(deptId){
     <div class="yc"><div class="yl">Net Purchases</div><div class="yv" style="color:var(--warning)">${fmt(ytdNetP)}</div></div>
   </div>`;
 
-  const budP=budSalesY/PERIODS;
   html+=`<div class="card"><h2>Period-by-Period Breakdown</h2><div class="tw"><table>
     <thead><tr><th>Period</th><th>Dates</th><th>Sales</th>${hasBudget?'<th>Bud Sales</th><th>Sales Diff</th>':''}<th>Net Purch</th><th>Open Inv</th><th>Close Inv</th><th>COGS</th><th>GP</th><th>Margin %</th>${hasBudget?'<th>Bud Mar</th><th>Mar Diff</th>':''}</tr></thead><tbody>`;
   let tS=0,tC=0,tG=0;
   cal.forEach((period,p)=>{
     const inv=getInv(activeDeptId,p),pe=entriesRange(activeDeptId,period.start,period.end),ps=calcM(pe,inv.open,inv.close);
     tS+=ps.sales;tC+=ps.cost;tG+=ps.gp;
-    const cc=chipClass(ps.margin,target),sDiff=ps.sales-budP,mDiff=ps.margin-budM;
+    const budP=budgetSalesP(activeDeptId,p),cc=chipClass(ps.margin,target),sDiff=ps.sales-budP,mDiff=ps.margin-budM;
     html+=`<tr style="cursor:pointer" onclick="showPage('p${p}')">
       <td><strong>P${p+1}</strong></td><td style="font-size:11px;color:var(--text2)">${fmtS(period.start)}–${fmtS(period.end)}</td>
       <td>${fmt(ps.sales)}</td>
@@ -1969,7 +1992,7 @@ function importCSV(event, deptId){
 function dlCSV(rows,name){const csv=rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\n');const b=new Blob([csv],{type:'text/csv'}),u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download=name;a.click();URL.revokeObjectURL(u);}
 function exportAllEntries(deptId){const rows=[['Date','Type','Amount','Description']];getEntries(deptId).sort((a,b)=>a.date>b.date?-1:1).forEach(e=>rows.push([e.date,e.type,e.amount,e.desc||'']));dlCSV(rows,'entries_'+deptId+'.csv');toast('Exported');}
 function exportPeriod(deptId,p){const cal=getCal(deptId),period=cal[p],inv=getInv(deptId,p),pe=entriesRange(deptId,period.start,period.end),ps=calcM(pe,inv.open,inv.close);const rows=[['Period','P'+(p+1)],['Start',dk(period.start)],['End',dk(period.end)],['Opening Inv',inv.open],['Closing Inv',inv.close],['Sales',ps.sales.toFixed(2)],['Net Purchases',ps.netPurchases.toFixed(2)],['Transfer In',ps.transferIn.toFixed(2)],['Transfer Out',ps.transferOut.toFixed(2)],['Outside',ps.outside.toFixed(2)],['Credits',ps.credits.toFixed(2)],['Scanbacks',ps.scanbacks.toFixed(2)],['COGS',ps.cost.toFixed(2)],['GP',ps.gp.toFixed(2)],['Margin %',ps.margin.toFixed(2)],[],[' Date','Type','Amount','Description']];pe.forEach(e=>rows.push([e.date,e.type,e.amount,e.desc||'']));dlCSV(rows,'period_'+(p+1)+'_'+deptId+'.csv');toast('Period '+(p+1)+' exported');}
-function exportYTD(deptId){const activeDeptId=isDualDept()?getActiveDeptId():deptId;const cal=getCal(deptId),bud=getBudget(activeDeptId),budP=(parseFloat(bud.salesYear)||0)/PERIODS,budM=parseFloat(bud.marginPct)||0;const rows=[['Period','Start','End','Open Inv','Close Inv','Sales','Bud Sales','Sales Diff','Net Purch','Trsf In','Trsf Out','Outside','Credits','Scanbacks','COGS','GP','Margin %','Bud Margin','Margin Diff']];cal.forEach((period,p)=>{const inv=getInv(activeDeptId,p),pe=entriesRange(activeDeptId,period.start,period.end),ps=calcM(pe,inv.open,inv.close);rows.push(['P'+(p+1),dk(period.start),dk(period.end),inv.open,inv.close,ps.sales.toFixed(2),budP.toFixed(2),(ps.sales-budP).toFixed(2),ps.netPurchases.toFixed(2),ps.transferIn.toFixed(2),ps.transferOut.toFixed(2),ps.outside.toFixed(2),ps.credits.toFixed(2),ps.scanbacks.toFixed(2),ps.cost.toFixed(2),ps.gp.toFixed(2),ps.margin.toFixed(2),budM.toFixed(2),(ps.margin-budM).toFixed(2)]);});dlCSV(rows,'ytd_'+deptId+'.csv');toast('YTD exported');}
+function exportYTD(deptId){const activeDeptId=isDualDept()?getActiveDeptId():deptId;const cal=getCal(deptId),bud=getBudget(activeDeptId),budM=parseFloat(bud.marginPct)||0;const rows=[['Period','Start','End','Open Inv','Close Inv','Sales','Bud Sales','Sales Diff','Net Purch','Trsf In','Trsf Out','Outside','Credits','Scanbacks','COGS','GP','Margin %','Bud Margin','Margin Diff']];cal.forEach((period,p)=>{const inv=getInv(activeDeptId,p),pe=entriesRange(activeDeptId,period.start,period.end),ps=calcM(pe,inv.open,inv.close),budP=budgetSalesP(activeDeptId,p);rows.push(['P'+(p+1),dk(period.start),dk(period.end),inv.open,inv.close,ps.sales.toFixed(2),budP.toFixed(2),(ps.sales-budP).toFixed(2),ps.netPurchases.toFixed(2),ps.transferIn.toFixed(2),ps.transferOut.toFixed(2),ps.outside.toFixed(2),ps.credits.toFixed(2),ps.scanbacks.toFixed(2),ps.cost.toFixed(2),ps.gp.toFixed(2),ps.margin.toFixed(2),budM.toFixed(2),(ps.margin-budM).toFixed(2)]);});dlCSV(rows,'ytd_'+deptId+'.csv');toast('YTD exported');}
 
 
 // ── SUPERUSER PIN MANAGEMENT ───────────────────────────────
