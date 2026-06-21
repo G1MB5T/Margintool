@@ -1643,6 +1643,8 @@ function renderPeriod(deptId,p){
     <div class="mtile"><div class="lbl">Outside Supplier</div><div class="val orange">${fmt(ps.outside)}</div></div>
     <div class="mtile"><div class="lbl">Credits</div><div class="val green">${fmt(ps.credits)}</div></div>
     <div class="mtile"><div class="lbl">Scanbacks</div><div class="val green">${fmt(ps.scanbacks)}</div></div>
+    ${ps.hasInv?`<div class="mtile"><div class="lbl">Opening Inv (+)</div><div class="val orange">${fmt(ps.openInv)}</div></div>
+    <div class="mtile"><div class="lbl">Closing Inv (−)</div><div class="val green">${fmt(ps.closeInv)}</div></div>`:''}
     <div class="mtile"><div class="lbl">${ps.hasInv?'True COGS':'Cost'}</div><div class="val orange">${fmt(ps.cost)}</div></div>
     <div class="mtile"><div class="lbl">Gross Profit</div><div class="val ${ps.gp>=0?'green':'red'}">${fmt(ps.gp)}</div></div>
     <div class="mtile"><div class="lbl">Margin %</div><div class="val ${mColor(ps.margin,t)}">${fmtP(ps.margin)}</div><div class="sub">Target: ${t}%</div></div>
