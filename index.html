@@ -823,9 +823,10 @@ function calcM(entries,oi,ci){
     if(e.type==='transferout') transferOut+=a;
   });
   const o=parseFloat(oi)||0,c=parseFloat(ci)||0,hasInv=(o>0&&c>0); // Both required for true margin
-  const netP = purchases+transferIn-transferOut;
-  const basicCost = netP+outside-credits-scanbacks;
-  const trueCOGS  = o+netP+outside-credits-scanbacks-c;
+  // Net Purchases now rolls in all purchase-side flows: adds = purchases + transferIn + outside; deducts = transferOut + credits + scanbacks
+  const netP = purchases+transferIn+outside-transferOut-credits-scanbacks;
+  const basicCost = netP;          // no inventory → cost = net purchases
+  const trueCOGS  = o+netP-c;      // with inventory → open + net purchases − close
   const cost = hasInv?trueCOGS:basicCost;
   const gp = sales-cost, margin = sales>0?(gp/sales)*100:0;
   return{sales,purchases,credits,scanbacks,outside,transferIn,transferOut,netPurchases:netP,cost,gp,margin,hasInv,openInv:o,closeInv:c,trueCOGS,basicCost};
@@ -1290,8 +1291,8 @@ function addEntryHTML(deptId){
   return`${getDualToggleBar(deptId)}<div class="ph"><div><h1>Add Entry</h1><div class="sub">Record purchases, sales, credits, scanbacks, outside supplier &amp; transfers</div></div></div>
   <div class="card"><h2>New Entry</h2>
   <div class="formula-box">
-    <strong>Net Purchases</strong> = Purchases + Transfer In − Transfer Out &nbsp;|&nbsp;
-    <strong>COGS</strong> = Open Inv + Net Purch + Outside − Credits − Scanbacks − Close Inv &nbsp;|&nbsp;
+    <strong>Net Purchases</strong> = Purchases + Transfer In + Outside − Transfer Out − Credits − Scanbacks &nbsp;|&nbsp;
+    <strong>COGS</strong> = Open Inv + Net Purchases − Close Inv &nbsp;|&nbsp;
     <strong>Margin %</strong> = (Sales − COGS) ÷ Sales × 100
   </div>
   <div class="fgrid">
@@ -1639,13 +1640,13 @@ function renderPeriod(deptId,p){
     <div class="mtile"><div class="lbl">Purchases</div><div class="val orange">${fmt(ps.purchases)}</div></div>
     <div class="mtile"><div class="lbl">Transfer In</div><div class="val orange">${fmt(ps.transferIn)}</div></div>
     <div class="mtile"><div class="lbl">Outside Supplier</div><div class="val orange">${fmt(ps.outside)}</div></div>
-    <div class="mtile"><div class="lbl">Net Purchases</div><div class="val orange">${fmt(ps.netPurchases)}</div></div>
     <div class="mtile"><div class="lbl">Transfer Out</div><div class="val green">${fmt(ps.transferOut)}</div></div>
     <div class="mtile"><div class="lbl">Credits</div><div class="val green">${fmt(ps.credits)}</div></div>
     <div class="mtile"><div class="lbl">Scanbacks</div><div class="val green">${fmt(ps.scanbacks)}</div></div>
+    <div class="mtile"><div class="lbl">Net Purchases</div><div class="val orange">${fmt(ps.netPurchases)}</div></div>
     ${ps.hasInv?`<div class="mtile"><div class="lbl">Opening Inv (+)</div><div class="val orange">${fmt(ps.openInv)}</div></div>
     <div class="mtile"><div class="lbl">Closing Inv (−)</div><div class="val green">${fmt(ps.closeInv)}</div></div>`:''}
-    <div class="mtile" title="${ps.hasInv?`True COGS = Opening Inv + Net Purchases + Outside − Credits − Scanbacks − Closing Inv\n= ${fmt(ps.openInv)} + ${fmt(ps.netPurchases)} + ${fmt(ps.outside)} − ${fmt(ps.credits)} − ${fmt(ps.scanbacks)} − ${fmt(ps.closeInv)}\n= ${fmt(ps.cost)}\n\nInventory Δ (Opening − Closing) = ${fmt(ps.openInv-ps.closeInv)} — this is why COGS differs from Net Purchases.`:`Cost = Net Purchases + Outside − Credits − Scanbacks\n= ${fmt(ps.netPurchases)} + ${fmt(ps.outside)} − ${fmt(ps.credits)} − ${fmt(ps.scanbacks)}\n= ${fmt(ps.cost)}\n\nEnter Opening & Closing Inventory (Week 1 / Week 4 headers) to switch to True COGS.`}"><div class="lbl">${ps.hasInv?'True COGS ⓘ':'Cost ⓘ'}</div><div class="val orange">${fmt(ps.cost)}</div>${ps.hasInv?`<div class="sub">incl. inv Δ ${(ps.openInv-ps.closeInv)>=0?'+':''}${fmt(ps.openInv-ps.closeInv)}</div>`:''}</div>
+    <div class="mtile" title="${ps.hasInv?`True COGS = Opening Inv + Net Purchases − Closing Inv\n= ${fmt(ps.openInv)} + ${fmt(ps.netPurchases)} − ${fmt(ps.closeInv)}\n= ${fmt(ps.cost)}\n\nInventory Δ (Opening − Closing) = ${fmt(ps.openInv-ps.closeInv)} — this is why True COGS differs from Net Purchases.`:`Cost = Net Purchases = ${fmt(ps.cost)}\n\nEnter Opening & Closing Inventory (Week 1 / Week 4 headers) to switch to True COGS.`}"><div class="lbl">${ps.hasInv?'True COGS ⓘ':'Cost ⓘ'}</div><div class="val orange">${fmt(ps.cost)}</div>${ps.hasInv?`<div class="sub">incl. inv Δ ${(ps.openInv-ps.closeInv)>=0?'+':''}${fmt(ps.openInv-ps.closeInv)}</div>`:''}</div>
     <div class="mtile"><div class="lbl">Gross Profit</div><div class="val ${ps.gp>=0?'green':'red'}">${fmt(ps.gp)}</div></div>
     <div class="mtile"><div class="lbl">Margin %</div><div class="val ${mColor(ps.margin,t)}">${fmtP(ps.margin)}</div><div class="sub">Target: ${t}%</div></div>
   </div>`;
@@ -1695,7 +1696,7 @@ function renderPeriod(deptId,p){
       </div>
     </div>
     <div class="card" style="padding:0;overflow:hidden;margin-bottom:18px"><div class="tw"><table>
-      <thead><tr><th>Day</th><th>Date</th><th>Sales</th><th>Purchases</th><th>Trsf In</th><th>Trsf Out</th><th>Net Purch</th><th>Outside</th><th>Credits</th><th>Scanbacks</th><th>Cost</th><th>GP</th><th>Margin %</th><th>Entries</th></tr></thead>
+      <thead><tr><th>Day</th><th>Date</th><th>Sales</th><th>Purchases</th><th>Trsf In</th><th>Outside</th><th>Trsf Out</th><th>Credits</th><th>Scanbacks</th><th>Net Purch</th><th>GP</th><th>Margin %</th><th>Entries</th></tr></thead>
       <tbody>`;
     let rS=0,rP=0,rTI=0,rTO=0,rO=0,rC=0,rSc=0;
     week.days.forEach((day,di)=>{
@@ -1706,22 +1707,21 @@ function renderPeriod(deptId,p){
         <td><strong>${dayNames[di]}</strong></td><td>${fmtS(day)}</td>
         <td>${dss.sales>0?fmt(dss.sales):dash}</td><td>${dss.purchases>0?fmt(dss.purchases):dash}</td>
         <td>${dss.transferIn>0?`<span style="color:#006064">${fmt(dss.transferIn)}</span>`:dash}</td>
-        <td>${dss.transferOut>0?`<span style="color:#880e4f">${fmt(dss.transferOut)}</span>`:dash}</td>
-        <td>${dss.netPurchases!==0?fmt(dss.netPurchases):dash}</td>
         <td>${dss.outside>0?fmt(dss.outside):dash}</td>
+        <td>${dss.transferOut>0?`<span style="color:#880e4f">${fmt(dss.transferOut)}</span>`:dash}</td>
         <td>${dss.credits>0?fmt(dss.credits):dash}</td>
         <td>${dss.scanbacks>0?fmt(dss.scanbacks):dash}</td>
-        <td>${dss.cost!==0?fmt(dss.cost):dash}</td>
+        <td>${dss.netPurchases!==0?fmt(dss.netPurchases):dash}</td>
         <td>${dss.gp!==0?fmt(dss.gp):dash}</td>
         <td>${dss.sales>0?`<span class="chip ${chipClass(dss.margin,t)}">${fmtP(dss.margin)}</span>`:dash}</td>
         <td>${de.length>0?`<span style="font-size:11px;color:var(--primary)">${de.length}</span>`:dash}</td>
       </tr>`;
     });
-    const wNetP=rP+rTI-rTO,wC=wNetP+rO-rC-rSc,wG=rS-wC,wM=rS>0?(wG/rS)*100:0;
+    const wNetP=rP+rTI+rO-rTO-rC-rSc,wG=rS-wNetP,wM=rS>0?(wG/rS)*100:0;
     html+=`<tr class="wtr"><td colspan="2">📊 Week ${w+1} Total</td><td>${fmt(rS)}</td><td>${fmt(rP)}</td>
-      <td style="color:#80deea">${fmt(rTI)}</td><td style="color:#f48fb1">${fmt(rTO)}</td>
-      <td>${fmt(wNetP)}</td><td>${fmt(rO)}</td><td>${fmt(rC)}</td><td>${fmt(rSc)}</td>
-      <td>${fmt(wC)}</td><td>${fmt(wG)}</td><td>${rS>0?fmtP(wM):'—'}</td><td></td>
+      <td style="color:#80deea">${fmt(rTI)}</td><td>${fmt(rO)}</td><td style="color:#f48fb1">${fmt(rTO)}</td>
+      <td>${fmt(rC)}</td><td>${fmt(rSc)}</td>
+      <td>${fmt(wNetP)}</td><td>${fmt(wG)}</td><td>${rS>0?fmtP(wM):'—'}</td><td></td>
     </tr></tbody></table></div></div>`;
   }
   c.innerHTML=html;
