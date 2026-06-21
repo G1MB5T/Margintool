@@ -803,7 +803,25 @@ function chipClass(m,t){const c=mColor(m,t);return c==='green'?'g':(c==='orange'
 
 function getEntries(deptId){ return Object.values((deptData[deptId]||{}).entries||{}); }
 function getInv(deptId,p){ const inv=((deptData[deptId]||{}).inventory||{})['p'+p]||{}; return{open:parseFloat(inv.open)||0,close:parseFloat(inv.close)||0}; }
-function getBudget(deptId){ return (deptData[deptId]||{}).budget||{salesYear:0,marginPct:0}; }
+// Annual sales budgets from the Sales Command dashboard (summed weekly dept_budget, FY2026).
+// Used only to fill a department's salesYear when it's missing/zero — a saved Firebase budget always wins.
+// marginPct here is a fallback only; an existing marginPct is preserved.
+const DEFAULT_BUDGETS = {
+  'dept_1778307770530':            {salesYear:15251775, marginPct:18.5}, // Grocery
+  'dept_1778307580813':            {salesYear:5898650,  marginPct:21.5}, // Meat
+  'dept_1778307477984':            {salesYear:3931550,  marginPct:28},   // Produce
+  'dept_1778261948525':            {salesYear:2175550,  marginPct:37},   // Deli (Sales Command dept total incl. Bento/Sushi)
+  'dept_1778307692274':            {salesYear:1453750,  marginPct:60},   // Bakery — Instore
+  'dept_1778307692274_commercial': {salesYear:317500,   marginPct:30}    // Bakery — Commercial
+};
+function getBudget(deptId){
+  var b = (deptData[deptId]||{}).budget || {salesYear:0,marginPct:0};
+  var def = DEFAULT_BUDGETS[deptId];
+  if(def && !(parseFloat(b.salesYear)>0)){
+    b = {salesYear:def.salesYear, marginPct:(parseFloat(b.marginPct)>0?b.marginPct:def.marginPct)};
+  }
+  return b;
+}
 function budgetSalesP(deptId){ return (parseFloat(getBudget(deptId).salesYear)||0)/PERIODS; }
 function budgetSalesW(deptId){ return (parseFloat(getBudget(deptId).salesYear)||0)/(PERIODS*WPP); }
 
@@ -1783,14 +1801,12 @@ function renderYTD(deptId){
     <div class="yc"><div class="yl">Overall Margin %</div><div class="yv" style="color:var(--${ymc==='green'?'success':'danger'})">${fmtP(ytdMargin)}</div>
       <div style="font-size:10px;color:var(--text2);margin-bottom:3px">Target: ${target}%</div>
       <div class="pb"><div class="pbi" style="width:${mp}%;background:var(--${ymc==='green'?'success':'danger'})"></div></div></div>
-    <div class="yc"><div class="yl">Transfer In</div><div class="yv" style="color:#006064">${fmt(ytdTIn)}</div></div>
-    <div class="yc"><div class="yl">Transfer Out</div><div class="yv" style="color:#880e4f">${fmt(ytdTOut)}</div></div>
     <div class="yc"><div class="yl">Net Purchases</div><div class="yv" style="color:var(--warning)">${fmt(ytdNetP)}</div></div>
   </div>`;
 
   const budP=budSalesY/PERIODS;
   html+=`<div class="card"><h2>Period-by-Period Breakdown</h2><div class="tw"><table>
-    <thead><tr><th>Period</th><th>Dates</th><th>Sales</th>${hasBudget?'<th>Bud Sales</th><th>Sales Diff</th>':''}<th>Net Purch</th><th>Trsf In</th><th>Trsf Out</th><th>Open Inv</th><th>Close Inv</th><th>COGS</th><th>GP</th><th>Margin %</th>${hasBudget?'<th>Bud Mar</th><th>Mar Diff</th>':''}</tr></thead><tbody>`;
+    <thead><tr><th>Period</th><th>Dates</th><th>Sales</th>${hasBudget?'<th>Bud Sales</th><th>Sales Diff</th>':''}<th>Net Purch</th><th>Open Inv</th><th>Close Inv</th><th>COGS</th><th>GP</th><th>Margin %</th>${hasBudget?'<th>Bud Mar</th><th>Mar Diff</th>':''}</tr></thead><tbody>`;
   let tS=0,tC=0,tG=0;
   cal.forEach((period,p)=>{
     const inv=getInv(activeDeptId,p),pe=entriesRange(activeDeptId,period.start,period.end),ps=calcM(pe,inv.open,inv.close);
@@ -1801,8 +1817,6 @@ function renderYTD(deptId){
       <td>${fmt(ps.sales)}</td>
       ${hasBudget?`<td style="color:var(--text2)">${fmt(budP)}</td><td><span class="bdiff ${sDiff>=0?'up':'down'}" style="font-size:11px">${sDiff>=0?'+':''}${fmt(sDiff)}</span></td>`:''}
       <td>${fmt(ps.netPurchases)}</td>
-      <td style="color:#006064">${ps.transferIn>0?fmt(ps.transferIn):'—'}</td>
-      <td style="color:#880e4f">${ps.transferOut>0?fmt(ps.transferOut):'—'}</td>
       <td>${inv.open>0?fmt(inv.open):'—'}</td><td>${inv.close>0?fmt(inv.close):'—'}</td>
       <td>${fmt(ps.cost)}</td><td>${fmt(ps.gp)}</td>
       <td>${ps.sales>0?`<span class="chip ${cc}">${fmtP(ps.margin)}</span>`:'—'}</td>
@@ -1813,7 +1827,7 @@ function renderYTD(deptId){
   html+=`<tr style="font-weight:700;background:#f8f9fa;border-top:2px solid var(--border)">
     <td colspan="2">YTD Total</td><td>${fmt(tS)}</td>
     ${hasBudget?`<td>${fmt(budSalesY)}</td><td><span class="bdiff ${tS>=budSalesY?'up':'down'}" style="font-size:11px">${tS>=budSalesY?'+':''}${fmt(tS-budSalesY)}</span></td>`:''}
-    <td colspan="6"></td><td>${fmt(tC)}</td><td>${fmt(tG)}</td>
+    <td colspan="3"></td><td>${fmt(tC)}</td><td>${fmt(tG)}</td>
     <td><span class="chip ${chipClass(ovm,target)}">${fmtP(ovm)}</span></td>
     ${hasBudget?`<td>${fmtP(budM)}</td><td><span class="bdiff ${ovm>=budM?'up':'down'}" style="font-size:11px">${ovm>=budM?'+':''}${(ovm-budM).toFixed(2)}%</span></td>`:''}
   </tr></tbody></table></div>
